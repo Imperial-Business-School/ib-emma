@@ -2,10 +2,19 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { getCurrentUser } from "@/lib/auth";
 import { query, queryOne } from "@/lib/db";
 import { parseCsv } from "@/lib/csv";
 
+async function assertAdmin(): Promise<void> {
+  const user = await getCurrentUser();
+  if (!user || user.role !== "admin") {
+    throw new Error("Admin only");
+  }
+}
+
 export async function createExamAction(formData: FormData) {
+  await assertAdmin();
   const name = String(formData.get("name") ?? "").trim();
   const code = String(formData.get("code") ?? "").trim() || null;
   if (!name) return;
@@ -20,6 +29,7 @@ export async function createExamAction(formData: FormData) {
 }
 
 export async function uploadSeatsAction(examId: number, formData: FormData) {
+  await assertAdmin();
   const file = formData.get("file");
   if (!(file instanceof File) || file.size === 0) {
     throw new Error("No file uploaded");
@@ -56,6 +66,7 @@ export async function uploadSeatsAction(examId: number, formData: FormData) {
 }
 
 export async function addSeatAction(examId: number, formData: FormData) {
+  await assertAdmin();
   const seat = String(formData.get("seat") ?? "").trim();
   const cid = String(formData.get("cid") ?? "").trim();
   if (!seat || !cid) return;
@@ -72,6 +83,7 @@ export async function addSeatAction(examId: number, formData: FormData) {
 }
 
 export async function deleteSeatAction(examId: number, submissionId: number) {
+  await assertAdmin();
   await query("DELETE FROM submissions WHERE id = $1 AND exam_id = $2", [
     submissionId,
     examId,
@@ -80,6 +92,7 @@ export async function deleteSeatAction(examId: number, submissionId: number) {
 }
 
 export async function deleteExamAction(examId: number) {
+  await assertAdmin();
   await query("DELETE FROM exams WHERE id = $1", [examId]);
   redirect("/admin");
 }

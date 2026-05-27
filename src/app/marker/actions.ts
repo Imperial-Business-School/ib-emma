@@ -1,13 +1,23 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { canMarkExam, getCurrentUser } from "@/lib/auth";
 import { query, queryOne } from "@/lib/db";
+
+async function assertCanMark(examId: number): Promise<void> {
+  const user = await getCurrentUser();
+  if (!user) throw new Error("Not authenticated");
+  if (user.role === "admin") return;
+  const ok = await canMarkExam(user.id, examId);
+  if (!ok) throw new Error("Not allocated to this exam");
+}
 
 export async function setGradeAction(
   examId: number,
   submissionId: number,
   formData: FormData,
 ) {
+  await assertCanMark(examId);
   const raw = String(formData.get("grade") ?? "").trim();
   if (raw === "") {
     await query(
@@ -27,6 +37,7 @@ export async function setGradeBySeatAction(
   examId: number,
   formData: FormData,
 ) {
+  await assertCanMark(examId);
   const seat = String(formData.get("seat") ?? "").trim();
   const grade = String(formData.get("grade") ?? "").trim();
   if (!seat) return;

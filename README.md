@@ -9,11 +9,25 @@ when entering grades.
 
 1. **Admin** creates an exam and uploads a two-column CSV of
    `seat_number, cid` pairs (or enters seats manually).
-2. **Markers** open the exam, see only seat numbers, and enter grades — CIDs
-   are never sent to the marker view (the marker SQL query never selects the
-   `cid` column).
-3. **Admin** downloads a Canvas Gradebook CSV (with CIDs revealed and grades
+2. **Admin** allocates markers to that exam by email. Each marker is auto-
+   emailed a magic-link sign-in.
+3. **Markers** click the link, see only the exams they were allocated to,
+   and enter grades by seat number. CIDs are never sent to the marker view
+   (the marker SQL query never selects the `cid` column).
+4. **Admin** downloads a Canvas Gradebook CSV (with CIDs revealed and grades
    filled in) and uploads it straight into Canvas.
+
+## Auth model
+
+- **Magic-link sign-in**: user enters email → we email a single-use,
+  30-minute link → click sets a 30-day signed JWT cookie.
+- **Roles**: `admin` (sees everything, manages exams and marker allocations)
+  and `marker` (sees only allocated exams; CID column is never selected).
+- **Admin bootstrap**: any address in the `ADMIN_EMAILS` env var
+  (comma-separated) is auto-promoted to admin on first sign-in. Defaults to
+  `r.banks@imperial.ac.uk` if the env var is unset.
+- **Marker provisioning**: markers are created when an admin allocates them
+  to an exam — unknown emails cannot self-sign-in.
 
 ## Stack
 
@@ -29,20 +43,32 @@ When you click the button Vercel will:
 1. Authorise the GitHub repo,
 2. Prompt you to provision a Postgres database (Neon free tier is fine — it
    automatically sets `POSTGRES_URL` for the app),
-3. Build and deploy. The schema is created lazily on first request, so
-   nothing else to wire up.
+3. Build and deploy. The schema is created lazily on first request.
+
+### Required env vars
+
+| Name | Required | Purpose |
+| --- | --- | --- |
+| `POSTGRES_URL` | yes (auto-set by Vercel/Neon) | Database connection string. |
+| `SESSION_SECRET` | yes | ≥32 random chars used to sign session JWTs. `openssl rand -hex 32` works. |
+| `ADMIN_EMAILS` | optional | Comma-separated allowlist of admin email addresses. Default: `r.banks@imperial.ac.uk`. |
+| `RESEND_API_KEY` | optional | Resend API key for sending magic-link emails. If unset, links are printed to server logs (fine for testing, not for real markers). |
+| `MAIL_FROM` | optional | Sender address. Default: `onboarding@resend.dev`. |
+| `APP_URL` | optional | Base URL the app is served from (used in magic-link emails). Default: derived from `VERCEL_URL` or `http://localhost:3000`. |
 
 ## Running locally
 
 ```
 npm install
-# point at any Postgres
 export POSTGRES_URL="postgres://user:pass@localhost:5432/cid_seat"
+export SESSION_SECRET="$(openssl rand -hex 32)"
+# RESEND_API_KEY is optional in dev — without it, magic-link URLs are
+# printed to the server logs.
 npm run dev
 ```
 
-Open <http://localhost:3000>. There is **no authentication** yet; the
-admin/marker split is by URL (`/admin` vs `/marker`).
+Open <http://localhost:3000> and sign in with `r.banks@imperial.ac.uk` (the
+default admin). Copy the magic link from the dev-server logs.
 
 ## Canvas Gradebook CSV
 

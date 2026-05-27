@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getCurrentUser } from "@/lib/auth";
 import { query, queryOne, type Exam, type Submission } from "@/lib/db";
 import { toCsv } from "@/lib/csv";
 
@@ -8,6 +9,11 @@ export async function GET(
   _req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const user = await getCurrentUser();
+  if (!user || user.role !== "admin") {
+    return new NextResponse("Forbidden", { status: 403 });
+  }
+
   const { id } = await params;
   const examId = Number(id);
   if (!Number.isFinite(examId)) {

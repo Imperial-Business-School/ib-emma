@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { getCurrentUser } from "@/lib/auth";
 import { query, type Exam } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -6,14 +8,30 @@ export const dynamic = "force-dynamic";
 type Row = Exam & { total: number; graded: number };
 
 export default async function MarkerHome() {
-  const exams = await query<Row>(
-    `SELECT e.*,
-            (SELECT COUNT(*) FROM submissions s WHERE s.exam_id = e.id)::int AS total,
-            (SELECT COUNT(*) FROM submissions s WHERE s.exam_id = e.id AND s.grade IS NOT NULL)::int AS graded
-     FROM exams e
-     WHERE EXISTS (SELECT 1 FROM submissions s WHERE s.exam_id = e.id)
-     ORDER BY e.created_at DESC`,
-  );
+  const user = await getCurrentUser();
+  if (!user) redirect("/login?next=/marker");
+
+  // Admins see all exams; markers only see allocated exams.
+  const exams =
+    user.role === "admin"
+      ? await query<Row>(
+          `SELECT e.*,
+                  (SELECT COUNT(*) FROM submissions s WHERE s.exam_id = e.id)::int AS total,
+                  (SELECT COUNT(*) FROM submissions s WHERE s.exam_id = e.id AND s.grade IS NOT NULL)::int AS graded
+           FROM exams e
+           WHERE EXISTS (SELECT 1 FROM submissions s WHERE s.exam_id = e.id)
+           ORDER BY e.created_at DESC`,
+        )
+      : await query<Row>(
+          `SELECT e.*,
+                  (SELECT COUNT(*) FROM submissions s WHERE s.exam_id = e.id)::int AS total,
+                  (SELECT COUNT(*) FROM submissions s WHERE s.exam_id = e.id AND s.grade IS NOT NULL)::int AS graded
+           FROM exams e
+           JOIN exam_markers em ON em.exam_id = e.id
+           WHERE em.user_id = $1
+           ORDER BY e.created_at DESC`,
+          [user.id],
+        );
 
   return (
     <div className="space-y-6">
@@ -38,7 +56,7 @@ export default async function MarkerHome() {
             {exams.length === 0 && (
               <tr>
                 <td colSpan={4} className="px-4 py-8 text-center text-slate-500">
-                  No exams available for marking yet.
+                  No exams allocated to you yet.
                 </td>
               </tr>
             )}

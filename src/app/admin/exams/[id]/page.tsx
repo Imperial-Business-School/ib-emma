@@ -48,6 +48,12 @@ export default async function AdminExamPage({
           </p>
         </div>
         <div className="flex gap-2">
+          <Link
+            href={`/admin/exams/${exam.id}/markers`}
+            className="rounded border bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50"
+          >
+            Markers
+          </Link>
           <a
             href={`/api/exams/${exam.id}/canvas.csv`}
             className="rounded border bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50"

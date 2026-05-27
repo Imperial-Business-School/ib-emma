@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { canMarkExam, getCurrentUser } from "@/lib/auth";
 import { query, queryOne, type Exam, type Submission } from "@/lib/db";
 import { setGradeAction, setGradeBySeatAction } from "../../actions";
 
@@ -19,10 +20,19 @@ export default async function MarkerExamPage({
   const examId = Number(id);
   if (!Number.isFinite(examId)) notFound();
 
+  const user = await getCurrentUser();
+  if (!user) redirect(`/login?next=/marker/exams/${examId}`);
+
   const exam = await queryOne<Exam>("SELECT * FROM exams WHERE id = $1", [
     examId,
   ]);
   if (!exam) notFound();
+
+  // Admins can view any exam; markers must be allocated.
+  if (user.role !== "admin") {
+    const allowed = await canMarkExam(user.id, examId);
+    if (!allowed) notFound();
+  }
 
   // Marker query: deliberately excludes the cid column.
   const submissions = await query<MarkerSubmission>(
