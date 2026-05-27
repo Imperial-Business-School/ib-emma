@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db, type Exam, type Submission } from "@/lib/db";
+import { query, queryOne, type Exam, type Submission } from "@/lib/db";
 import { toCsv } from "@/lib/csv";
 
 export const dynamic = "force-dynamic";
@@ -14,18 +14,17 @@ export async function GET(
     return new NextResponse("Invalid exam id", { status: 400 });
   }
 
-  const exam = db.prepare("SELECT * FROM exams WHERE id = ?").get(examId) as
-    | Exam
-    | undefined;
+  const exam = await queryOne<Exam>("SELECT * FROM exams WHERE id = $1", [
+    examId,
+  ]);
   if (!exam) return new NextResponse("Exam not found", { status: 404 });
 
-  const submissions = db
-    .prepare(
-      `SELECT * FROM submissions
-       WHERE exam_id = ? AND grade IS NOT NULL
-       ORDER BY cid`,
-    )
-    .all(examId) as Submission[];
+  const submissions = await query<Submission>(
+    `SELECT * FROM submissions
+     WHERE exam_id = $1 AND grade IS NOT NULL
+     ORDER BY cid`,
+    [examId],
+  );
 
   // Canvas Gradebook import format. Canvas matches students by SIS User ID
   // (the CID at Imperial). The other ID columns can be blank. The assignment

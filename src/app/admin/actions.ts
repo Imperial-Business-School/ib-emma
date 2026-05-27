@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { db } from "@/lib/db";
+import { query, queryOne } from "@/lib/db";
 import { parseCsv } from "@/lib/csv";
 
 export async function createExamAction(formData: FormData) {
@@ -10,11 +10,13 @@ export async function createExamAction(formData: FormData) {
   const code = String(formData.get("code") ?? "").trim() || null;
   if (!name) return;
 
-  const result = db
-    .prepare("INSERT INTO exams (name, code) VALUES (?, ?)")
-    .run(name, code);
+  const row = await queryOne<{ id: number }>(
+    "INSERT INTO exams (name, code) VALUES ($1, $2) RETURNING id",
+    [name, code],
+  );
+  if (!row) throw new Error("Failed to create exam");
 
-  redirect(`/admin/exams/${result.lastInsertRowid}`);
+  redirect(`/admin/exams/${row.id}`);
 }
 
 export async function uploadSeatsAction(examId: number, formData: FormData) {
@@ -26,19 +28,9 @@ export async function uploadSeatsAction(examId: number, formData: FormData) {
   const rows = parseCsv(text);
   if (rows.length === 0) throw new Error("CSV is empty");
 
-  // Detect header by looking at row 0
   let start = 0;
   const first = rows[0].map((s) => s.trim().toLowerCase());
   if (first.some((c) => /seat|cid|student/i.test(c))) start = 1;
-
-  const insert = db.prepare(
-    `INSERT INTO submissions (exam_id, seat_number, cid)
-     VALUES (?, ?, ?)
-     ON CONFLICT(exam_id, seat_number) DO UPDATE SET cid = excluded.cid`,
-  );
-  const tx = db.transaction((entries: { seat: string; cid: string }[]) => {
-    for (const { seat, cid } of entries) insert.run(examId, seat, cid);
-  });
 
   const entries: { seat: string; cid: string }[] = [];
   for (let i = start; i < rows.length; i++) {
@@ -49,7 +41,16 @@ export async function uploadSeatsAction(examId: number, formData: FormData) {
     entries.push({ seat, cid });
   }
   if (entries.length === 0) throw new Error("No valid seat/CID rows found");
-  tx(entries);
+
+  for (const { seat, cid } of entries) {
+    await query(
+      `INSERT INTO submissions (exam_id, seat_number, cid)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (exam_id, seat_number)
+       DO UPDATE SET cid = EXCLUDED.cid`,
+      [examId, seat, cid],
+    );
+  }
 
   revalidatePath(`/admin/exams/${examId}`);
 }
@@ -59,24 +60,26 @@ export async function addSeatAction(examId: number, formData: FormData) {
   const cid = String(formData.get("cid") ?? "").trim();
   if (!seat || !cid) return;
 
-  db.prepare(
+  await query(
     `INSERT INTO submissions (exam_id, seat_number, cid)
-     VALUES (?, ?, ?)
-     ON CONFLICT(exam_id, seat_number) DO UPDATE SET cid = excluded.cid`,
-  ).run(examId, seat, cid);
+     VALUES ($1, $2, $3)
+     ON CONFLICT (exam_id, seat_number)
+     DO UPDATE SET cid = EXCLUDED.cid`,
+    [examId, seat, cid],
+  );
 
   revalidatePath(`/admin/exams/${examId}`);
 }
 
 export async function deleteSeatAction(examId: number, submissionId: number) {
-  db.prepare("DELETE FROM submissions WHERE id = ? AND exam_id = ?").run(
+  await query("DELETE FROM submissions WHERE id = $1 AND exam_id = $2", [
     submissionId,
     examId,
-  );
+  ]);
   revalidatePath(`/admin/exams/${examId}`);
 }
 
 export async function deleteExamAction(examId: number) {
-  db.prepare("DELETE FROM exams WHERE id = ?").run(examId);
+  await query("DELETE FROM exams WHERE id = $1", [examId]);
   redirect("/admin");
 }

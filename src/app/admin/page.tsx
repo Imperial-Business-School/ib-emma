@@ -1,21 +1,19 @@
 import Link from "next/link";
-import { db, type Exam } from "@/lib/db";
+import { query, type Exam } from "@/lib/db";
 import { createExamAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
 type ExamRow = Exam & { total: number; graded: number };
 
-export default function AdminHome() {
-  const exams = db
-    .prepare(
-      `SELECT e.*,
-              (SELECT COUNT(*) FROM submissions s WHERE s.exam_id = e.id) AS total,
-              (SELECT COUNT(*) FROM submissions s WHERE s.exam_id = e.id AND s.grade IS NOT NULL) AS graded
-       FROM exams e
-       ORDER BY e.created_at DESC`,
-    )
-    .all() as ExamRow[];
+export default async function AdminHome() {
+  const exams = await query<ExamRow>(
+    `SELECT e.*,
+            (SELECT COUNT(*) FROM submissions s WHERE s.exam_id = e.id)::int AS total,
+            (SELECT COUNT(*) FROM submissions s WHERE s.exam_id = e.id AND s.grade IS NOT NULL)::int AS graded
+     FROM exams e
+     ORDER BY e.created_at DESC`,
+  );
 
   return (
     <div className="space-y-8">
@@ -76,7 +74,7 @@ export default function AdminHome() {
                   {e.graded} / {e.total} graded
                 </td>
                 <td className="px-4 py-3 text-slate-600">
-                  {new Date(e.created_at + "Z").toLocaleDateString()}
+                  {new Date(e.created_at).toLocaleDateString()}
                 </td>
                 <td className="px-4 py-3 text-right">
                   <Link

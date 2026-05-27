@@ -10,29 +10,39 @@ when entering grades.
 1. **Admin** creates an exam and uploads a two-column CSV of
    `seat_number, cid` pairs (or enters seats manually).
 2. **Markers** open the exam, see only seat numbers, and enter grades — CIDs
-   are never sent to the marker view.
+   are never sent to the marker view (the marker SQL query never selects the
+   `cid` column).
 3. **Admin** downloads a Canvas Gradebook CSV (with CIDs revealed and grades
    filled in) and uploads it straight into Canvas.
-
-Information asymmetry is enforced at the database query layer: the marker
-pages select `id, seat_number, grade, graded_at` — `cid` is never selected.
 
 ## Stack
 
 - Next.js 15 (App Router) + TypeScript
-- SQLite via `better-sqlite3` (file lives in `./data/cid-seat.db`)
+- Postgres via `pg` (any provider — Neon, Supabase, RDS, local)
 - Tailwind CSS
+
+## Deploy to Vercel (get a public URL in ~2 minutes)
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FrbanksIB%2Fcid-seat&project-name=cid-seat&repository-name=cid-seat&stores=%5B%7B%22type%22%3A%22postgres%22%7D%5D)
+
+When you click the button Vercel will:
+1. Authorise the GitHub repo,
+2. Prompt you to provision a Postgres database (Neon free tier is fine — it
+   automatically sets `POSTGRES_URL` for the app),
+3. Build and deploy. The schema is created lazily on first request, so
+   nothing else to wire up.
 
 ## Running locally
 
 ```
 npm install
+# point at any Postgres
+export POSTGRES_URL="postgres://user:pass@localhost:5432/cid_seat"
 npm run dev
 ```
 
-Open <http://localhost:3000>. There is currently **no authentication**; the
-admin/marker split is by URL (`/admin` vs `/marker`) — to be replaced with
-real auth later.
+Open <http://localhost:3000>. There is **no authentication** yet; the
+admin/marker split is by URL (`/admin` vs `/marker`).
 
 ## Canvas Gradebook CSV
 

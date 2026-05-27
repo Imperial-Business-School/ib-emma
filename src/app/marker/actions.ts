@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { db } from "@/lib/db";
+import { query, queryOne } from "@/lib/db";
 
 export async function setGradeAction(
   examId: number,
@@ -10,13 +10,15 @@ export async function setGradeAction(
 ) {
   const raw = String(formData.get("grade") ?? "").trim();
   if (raw === "") {
-    db.prepare(
-      "UPDATE submissions SET grade = NULL, graded_at = NULL WHERE id = ? AND exam_id = ?",
-    ).run(submissionId, examId);
+    await query(
+      "UPDATE submissions SET grade = NULL, graded_at = NULL WHERE id = $1 AND exam_id = $2",
+      [submissionId, examId],
+    );
   } else {
-    db.prepare(
-      "UPDATE submissions SET grade = ?, graded_at = datetime('now') WHERE id = ? AND exam_id = ?",
-    ).run(raw, submissionId, examId);
+    await query(
+      "UPDATE submissions SET grade = $1, graded_at = now() WHERE id = $2 AND exam_id = $3",
+      [raw, submissionId, examId],
+    );
   }
   revalidatePath(`/marker/exams/${examId}`);
 }
@@ -29,24 +31,24 @@ export async function setGradeBySeatAction(
   const grade = String(formData.get("grade") ?? "").trim();
   if (!seat) return;
 
-  const row = db
-    .prepare(
-      "SELECT id FROM submissions WHERE exam_id = ? AND seat_number = ?",
-    )
-    .get(examId, seat) as { id: number } | undefined;
-
+  const row = await queryOne<{ id: number }>(
+    "SELECT id FROM submissions WHERE exam_id = $1 AND seat_number = $2",
+    [examId, seat],
+  );
   if (!row) {
     throw new Error(`Seat ${seat} not found for this exam`);
   }
 
   if (grade === "") {
-    db.prepare(
-      "UPDATE submissions SET grade = NULL, graded_at = NULL WHERE id = ?",
-    ).run(row.id);
+    await query(
+      "UPDATE submissions SET grade = NULL, graded_at = NULL WHERE id = $1",
+      [row.id],
+    );
   } else {
-    db.prepare(
-      "UPDATE submissions SET grade = ?, graded_at = datetime('now') WHERE id = ?",
-    ).run(grade, row.id);
+    await query(
+      "UPDATE submissions SET grade = $1, graded_at = now() WHERE id = $2",
+      [grade, row.id],
+    );
   }
   revalidatePath(`/marker/exams/${examId}`);
 }

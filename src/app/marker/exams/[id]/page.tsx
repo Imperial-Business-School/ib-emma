@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { db, type Exam, type Submission } from "@/lib/db";
+import { query, queryOne, type Exam, type Submission } from "@/lib/db";
 import { setGradeAction, setGradeBySeatAction } from "../../actions";
 
 export const dynamic = "force-dynamic";
@@ -19,20 +19,19 @@ export default async function MarkerExamPage({
   const examId = Number(id);
   if (!Number.isFinite(examId)) notFound();
 
-  const exam = db.prepare("SELECT * FROM exams WHERE id = ?").get(examId) as
-    | Exam
-    | undefined;
+  const exam = await queryOne<Exam>("SELECT * FROM exams WHERE id = $1", [
+    examId,
+  ]);
   if (!exam) notFound();
 
   // Marker query: deliberately excludes the cid column.
-  const submissions = db
-    .prepare(
-      `SELECT id, seat_number, grade, graded_at
-       FROM submissions
-       WHERE exam_id = ?
-       ORDER BY seat_number`,
-    )
-    .all(examId) as MarkerSubmission[];
+  const submissions = await query<MarkerSubmission>(
+    `SELECT id, seat_number, grade, graded_at
+     FROM submissions
+     WHERE exam_id = $1
+     ORDER BY seat_number`,
+    [examId],
+  );
 
   const total = submissions.length;
   const graded = submissions.filter((s) => s.grade !== null).length;
@@ -135,7 +134,7 @@ export default async function MarkerExamPage({
                 </td>
                 <td className="px-4 py-2 text-slate-600">
                   {s.graded_at
-                    ? new Date(s.graded_at + "Z").toLocaleString()
+                    ? new Date(s.graded_at).toLocaleString()
                     : "—"}
                 </td>
               </tr>

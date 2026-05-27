@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { db, type Exam, type Submission } from "@/lib/db";
+import { query, queryOne, type Exam, type Submission } from "@/lib/db";
 import {
   addSeatAction,
   deleteExamAction,
@@ -19,16 +19,15 @@ export default async function AdminExamPage({
   const examId = Number(id);
   if (!Number.isFinite(examId)) notFound();
 
-  const exam = db.prepare("SELECT * FROM exams WHERE id = ?").get(examId) as
-    | Exam
-    | undefined;
+  const exam = await queryOne<Exam>("SELECT * FROM exams WHERE id = $1", [
+    examId,
+  ]);
   if (!exam) notFound();
 
-  const submissions = db
-    .prepare(
-      "SELECT * FROM submissions WHERE exam_id = ? ORDER BY seat_number",
-    )
-    .all(examId) as Submission[];
+  const submissions = await query<Submission>(
+    "SELECT * FROM submissions WHERE exam_id = $1 ORDER BY seat_number",
+    [examId],
+  );
 
   const total = submissions.length;
   const graded = submissions.filter((s) => s.grade !== null).length;
@@ -164,7 +163,7 @@ export default async function AdminExamPage({
                 </td>
                 <td className="px-4 py-2 text-slate-600">
                   {s.graded_at
-                    ? new Date(s.graded_at + "Z").toLocaleString()
+                    ? new Date(s.graded_at).toLocaleString()
                     : "—"}
                 </td>
                 <td className="px-4 py-2 text-right">

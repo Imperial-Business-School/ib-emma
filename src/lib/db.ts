@@ -1,51 +1,91 @@
-import Database from "better-sqlite3";
-import fs from "node:fs";
-import path from "node:path";
-
-const dataDir = path.join(process.cwd(), "data");
-if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
-
-const dbPath = path.join(dataDir, "cid-seat.db");
+import { Pool, type QueryResultRow } from "pg";
 
 declare global {
   // eslint-disable-next-line no-var
-  var __db: Database.Database | undefined;
+  var __pool: Pool | undefined;
+  // eslint-disable-next-line no-var
+  var __initPromise: Promise<void> | undefined;
 }
 
-function init(db: Database.Database) {
-  db.pragma("journal_mode = WAL");
-  db.pragma("foreign_keys = ON");
-  db.exec(`
+function getConnectionString(): string {
+  const url =
+    process.env.POSTGRES_URL ||
+    process.env.DATABASE_URL ||
+    process.env.POSTGRES_PRISMA_URL;
+  if (!url) {
+    throw new Error(
+      "No Postgres connection string. Set POSTGRES_URL or DATABASE_URL.",
+    );
+  }
+  return url;
+}
+
+function getPool(): Pool {
+  if (!global.__pool) {
+    const connectionString = getConnectionString();
+    // Many hosted Postgres providers (Neon, Supabase, RDS) require SSL.
+    const needsSsl =
+      /sslmode=require/i.test(connectionString) ||
+      /neon\.tech|supabase\.co|rds\.amazonaws\.com/i.test(connectionString);
+    global.__pool = new Pool({
+      connectionString,
+      ssl: needsSsl ? { rejectUnauthorized: false } : undefined,
+      max: 5,
+    });
+  }
+  return global.__pool;
+}
+
+async function initSchema(): Promise<void> {
+  const pool = getPool();
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS exams (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      id SERIAL PRIMARY KEY,
       name TEXT NOT NULL,
       code TEXT,
-      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
 
     CREATE TABLE IF NOT EXISTS submissions (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      exam_id INTEGER NOT NULL,
+      id SERIAL PRIMARY KEY,
+      exam_id INTEGER NOT NULL REFERENCES exams(id) ON DELETE CASCADE,
       seat_number TEXT NOT NULL,
       cid TEXT NOT NULL,
       grade TEXT,
-      graded_at TEXT,
-      UNIQUE(exam_id, seat_number),
-      FOREIGN KEY (exam_id) REFERENCES exams(id) ON DELETE CASCADE
+      graded_at TIMESTAMPTZ,
+      UNIQUE (exam_id, seat_number)
     );
 
     CREATE INDEX IF NOT EXISTS idx_submissions_exam ON submissions(exam_id);
   `);
 }
 
-export const db: Database.Database =
-  global.__db ??
-  (() => {
-    const d = new Database(dbPath);
-    init(d);
-    global.__db = d;
-    return d;
-  })();
+async function ensureReady(): Promise<void> {
+  if (!global.__initPromise) {
+    global.__initPromise = initSchema().catch((err) => {
+      global.__initPromise = undefined;
+      throw err;
+    });
+  }
+  return global.__initPromise;
+}
+
+export async function query<T extends QueryResultRow = QueryResultRow>(
+  text: string,
+  params: unknown[] = [],
+): Promise<T[]> {
+  await ensureReady();
+  const res = await getPool().query<T>(text, params as never[]);
+  return res.rows;
+}
+
+export async function queryOne<T extends QueryResultRow = QueryResultRow>(
+  text: string,
+  params: unknown[] = [],
+): Promise<T | undefined> {
+  const rows = await query<T>(text, params);
+  return rows[0];
+}
 
 export type Exam = {
   id: number;

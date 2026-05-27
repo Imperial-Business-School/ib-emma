@@ -1,21 +1,19 @@
 import Link from "next/link";
-import { db, type Exam } from "@/lib/db";
+import { query, type Exam } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
 type Row = Exam & { total: number; graded: number };
 
-export default function MarkerHome() {
-  const exams = db
-    .prepare(
-      `SELECT e.*,
-              (SELECT COUNT(*) FROM submissions s WHERE s.exam_id = e.id) AS total,
-              (SELECT COUNT(*) FROM submissions s WHERE s.exam_id = e.id AND s.grade IS NOT NULL) AS graded
-       FROM exams e
-       WHERE (SELECT COUNT(*) FROM submissions s WHERE s.exam_id = e.id) > 0
-       ORDER BY e.created_at DESC`,
-    )
-    .all() as Row[];
+export default async function MarkerHome() {
+  const exams = await query<Row>(
+    `SELECT e.*,
+            (SELECT COUNT(*) FROM submissions s WHERE s.exam_id = e.id)::int AS total,
+            (SELECT COUNT(*) FROM submissions s WHERE s.exam_id = e.id AND s.grade IS NOT NULL)::int AS graded
+     FROM exams e
+     WHERE EXISTS (SELECT 1 FROM submissions s WHERE s.exam_id = e.id)
+     ORDER BY e.created_at DESC`,
+  );
 
   return (
     <div className="space-y-6">
