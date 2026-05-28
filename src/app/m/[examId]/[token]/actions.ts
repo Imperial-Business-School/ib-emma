@@ -1,45 +1,38 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import {
-  createMagicLinkToken,
-  getAppUrl,
-  getCurrentUser,
-  getMarkerRoleForExam,
-  type MarkerRole,
-} from "@/lib/auth";
 import { query, queryOne, type Exam } from "@/lib/db";
-import { sendMagicLinkEmail } from "@/lib/email";
 import { computeSampleIds } from "@/lib/sampling";
 
-type AccessContext = {
-  examId: number;
-  exam: Exam;
-  role: MarkerRole;
-};
+type MarkerRole = "primary" | "secondary";
 
-async function assertMarkerForExam(examId: number): Promise<AccessContext> {
-  const user = await getCurrentUser();
-  if (!user) throw new Error("Not authenticated");
+type AccessContext = { exam: Exam; role: MarkerRole };
+
+async function authorize(
+  examId: number,
+  token: string,
+): Promise<AccessContext> {
   const exam = await queryOne<Exam>("SELECT * FROM exams WHERE id = $1", [
     examId,
   ]);
   if (!exam) throw new Error("Exam not found");
-  const role = await getMarkerRoleForExam(user.id, examId);
-  if (!role) throw new Error("Not allocated to this exam");
-  return { examId, exam, role };
+  if (!token) throw new Error("Missing access token");
+  if (token === exam.primary_access_token) return { exam, role: "primary" };
+  if (token === exam.secondary_access_token) return { exam, role: "secondary" };
+  throw new Error("Invalid access token");
 }
 
 function expectedMarkerStatusFor(role: MarkerRole): Exam["status"] {
   return role === "primary" ? "primary_marking" : "secondary_marking";
 }
 
-export async function setGradeBySeatAction(
+export async function setGradeBySeatByTokenAction(
   examId: number,
+  token: string,
   formData: FormData,
 ) {
-  const ctx = await assertMarkerForExam(examId);
-  if (ctx.exam.status !== expectedMarkerStatusFor(ctx.role)) {
+  const { exam, role } = await authorize(examId, token);
+  if (exam.status !== expectedMarkerStatusFor(role)) {
     throw new Error("Marking is not currently open for you on this exam");
   }
   const seat = String(formData.get("seat") ?? "").trim();
@@ -51,23 +44,22 @@ export async function setGradeBySeatAction(
     [examId, seat],
   );
   if (!row) throw new Error(`Seat ${seat} not found for this exam`);
-
-  // Secondary marker may only grade sampled seats.
-  if (ctx.role === "secondary" && !row.in_sample) {
+  if (role === "secondary" && !row.in_sample) {
     throw new Error(`Seat ${seat} is not in the second-marking sample`);
   }
 
-  await writeGrade(ctx.role, row.id, grade);
-  revalidatePath(`/marker/exams/${examId}`);
+  await writeGrade(role, row.id, grade);
+  revalidatePath(`/m/${examId}/${token}`);
 }
 
-export async function setGradeAction(
+export async function setGradeByTokenAction(
   examId: number,
+  token: string,
   submissionId: number,
   formData: FormData,
 ) {
-  const ctx = await assertMarkerForExam(examId);
-  if (ctx.exam.status !== expectedMarkerStatusFor(ctx.role)) {
+  const { exam, role } = await authorize(examId, token);
+  if (exam.status !== expectedMarkerStatusFor(role)) {
     throw new Error("Marking is not currently open for you on this exam");
   }
 
@@ -76,13 +68,13 @@ export async function setGradeAction(
     [submissionId, examId],
   );
   if (!sub) throw new Error("Submission not found");
-  if (ctx.role === "secondary" && !sub.in_sample) {
+  if (role === "secondary" && !sub.in_sample) {
     throw new Error("That seat is not in the second-marking sample");
   }
 
   const raw = String(formData.get("grade") ?? "").trim();
-  await writeGrade(ctx.role, sub.id, raw);
-  revalidatePath(`/marker/exams/${examId}`);
+  await writeGrade(role, sub.id, raw);
+  revalidatePath(`/m/${examId}/${token}`);
 }
 
 async function writeGrade(
@@ -117,10 +109,13 @@ async function writeGrade(
   }
 }
 
-export async function completePrimaryMarkingAction(examId: number) {
-  const ctx = await assertMarkerForExam(examId);
-  if (ctx.role !== "primary") throw new Error("Only the primary marker can do this");
-  if (ctx.exam.status !== "primary_marking") {
+export async function completePrimaryMarkingByTokenAction(
+  examId: number,
+  token: string,
+) {
+  const { exam, role } = await authorize(examId, token);
+  if (role !== "primary") throw new Error("Primary marker only");
+  if (exam.status !== "primary_marking") {
     throw new Error("Primary marking is not currently in progress");
   }
 
@@ -132,12 +127,8 @@ export async function completePrimaryMarkingAction(examId: number) {
   if (ungraded > 0) {
     throw new Error(`${ungraded} seat(s) still need a grade before completion`);
   }
-  if (!ctx.exam.secondary_marker_id) {
-    throw new Error("No secondary marker assigned");
-  }
 
   const sampleIds = computeSampleIds(subs);
-
   await query("UPDATE submissions SET in_sample = false WHERE exam_id = $1", [
     examId,
   ]);
@@ -155,32 +146,17 @@ export async function completePrimaryMarkingAction(examId: number) {
     [examId],
   );
 
-  const secondary = await queryOne<{ id: number; email: string }>(
-    "SELECT id, email FROM users WHERE id = $1",
-    [ctx.exam.secondary_marker_id],
-  );
-  if (secondary) {
-    const token = await createMagicLinkToken(secondary.id);
-    const link = `${getAppUrl()}/api/auth/verify?token=${encodeURIComponent(token)}&next=${encodeURIComponent(`/marker/exams/${examId}`)}`;
-    try {
-      await sendMagicLinkEmail(secondary.email, link, {
-        examName: ctx.exam.name,
-      });
-    } catch (err) {
-      console.error("Failed to email secondary marker", err);
-    }
-  }
-
-  revalidatePath(`/marker/exams/${examId}`);
+  revalidatePath(`/m/${examId}/${token}`);
   revalidatePath(`/admin/exams/${examId}`);
 }
 
-export async function completeSecondaryMarkingAction(examId: number) {
-  const ctx = await assertMarkerForExam(examId);
-  if (ctx.role !== "secondary") {
-    throw new Error("Only the secondary marker can do this");
-  }
-  if (ctx.exam.status !== "secondary_marking") {
+export async function completeSecondaryMarkingByTokenAction(
+  examId: number,
+  token: string,
+) {
+  const { exam, role } = await authorize(examId, token);
+  if (role !== "secondary") throw new Error("Secondary marker only");
+  if (exam.status !== "secondary_marking") {
     throw new Error("Secondary marking is not currently in progress");
   }
 
@@ -210,6 +186,6 @@ export async function completeSecondaryMarkingAction(examId: number) {
     [hasDiscrepancies ? "review" : "complete", examId],
   );
 
-  revalidatePath(`/marker/exams/${examId}`);
+  revalidatePath(`/m/${examId}/${token}`);
   revalidatePath(`/admin/exams/${examId}`);
 }

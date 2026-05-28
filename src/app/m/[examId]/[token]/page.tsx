@@ -1,76 +1,68 @@
-import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
-import { getCurrentUser, getMarkerRoleForExam } from "@/lib/auth";
+import { notFound } from "next/navigation";
 import { query, queryOne, type Exam, type Submission } from "@/lib/db";
 import {
-  completePrimaryMarkingAction,
-  completeSecondaryMarkingAction,
-  setGradeAction,
-  setGradeBySeatAction,
-} from "../../actions";
+  completePrimaryMarkingByTokenAction,
+  completeSecondaryMarkingByTokenAction,
+  setGradeBySeatByTokenAction,
+  setGradeByTokenAction,
+} from "./actions";
 
 export const dynamic = "force-dynamic";
 
-export default async function MarkerExamPage({
+type MarkerRole = "primary" | "secondary";
+
+export default async function MarkerByTokenPage({
   params,
 }: {
-  params: Promise<{ id: string }>;
+  params: Promise<{ examId: string; token: string }>;
 }) {
-  const { id } = await params;
-  const examId = Number(id);
+  const { examId: rawId, token } = await params;
+  const examId = Number(rawId);
   if (!Number.isFinite(examId)) notFound();
-
-  const user = await getCurrentUser();
-  if (!user) redirect(`/login?next=/marker/exams/${examId}`);
 
   const exam = await queryOne<Exam>("SELECT * FROM exams WHERE id = $1", [
     examId,
   ]);
   if (!exam) notFound();
 
-  const role = await getMarkerRoleForExam(user.id, examId);
-  if (role === null) notFound();
-
-  // Primary marker (and admin) see every seat; secondary sees only sampled seats.
-  const rows =
-    role === "secondary"
-      ? await query<
-          Pick<
-            Submission,
-            | "id"
-            | "seat_number"
-            | "grade"
-            | "secondary_grade"
-            | "secondary_graded_at"
-            | "in_sample"
-          >
-        >(
-          `SELECT id, seat_number, grade, secondary_grade, secondary_graded_at, in_sample
-           FROM submissions
-           WHERE exam_id = $1 AND in_sample = true
-           ORDER BY seat_number`,
-          [examId],
-        )
-      : await query<
-          Pick<
-            Submission,
-            | "id"
-            | "seat_number"
-            | "grade"
-            | "graded_at"
-            | "secondary_grade"
-            | "in_sample"
-          >
-        >(
-          `SELECT id, seat_number, grade, graded_at, secondary_grade, in_sample
-           FROM submissions
-           WHERE exam_id = $1
-           ORDER BY seat_number`,
-          [examId],
-        );
+  let role: MarkerRole;
+  if (token && token === exam.primary_access_token) role = "primary";
+  else if (token && token === exam.secondary_access_token) role = "secondary";
+  else notFound();
 
   const isPrimary = role === "primary";
   const isSecondary = role === "secondary";
+
+  const rows = isSecondary
+    ? await query<
+        Pick<
+          Submission,
+          | "id"
+          | "seat_number"
+          | "grade"
+          | "secondary_grade"
+          | "secondary_graded_at"
+          | "in_sample"
+        >
+      >(
+        `SELECT id, seat_number, grade, secondary_grade, secondary_graded_at, in_sample
+         FROM submissions
+         WHERE exam_id = $1 AND in_sample = true
+         ORDER BY seat_number`,
+        [examId],
+      )
+    : await query<
+        Pick<
+          Submission,
+          "id" | "seat_number" | "grade" | "graded_at" | "in_sample"
+        >
+      >(
+        `SELECT id, seat_number, grade, graded_at, in_sample
+         FROM submissions
+         WHERE exam_id = $1
+         ORDER BY seat_number`,
+        [examId],
+      );
 
   const markingOpen =
     (isPrimary && exam.status === "primary_marking") ||
@@ -78,17 +70,15 @@ export default async function MarkerExamPage({
 
   const total = rows.length;
   const graded = isSecondary
-    ? rows.filter((r) => r.secondary_grade !== null).length
+    ? rows.filter((r) => "secondary_grade" in r && r.secondary_grade !== null)
+        .length
     : rows.filter((r) => r.grade !== null).length;
   const canComplete = markingOpen && total > 0 && graded === total;
 
   return (
     <div className="space-y-8">
       <div>
-        <Link href="/marker" className="text-sm text-blue-600 hover:underline">
-          ← All exams
-        </Link>
-        <h1 className="mt-1 text-2xl font-bold">{exam.name}</h1>
+        <h1 className="text-2xl font-bold">{exam.name}</h1>
         {exam.code && <p className="text-sm text-slate-600">{exam.code}</p>}
         <p className="mt-2 text-sm text-slate-600">
           You are the{" "}
@@ -101,13 +91,13 @@ export default async function MarkerExamPage({
       {!markingOpen && (
         <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
           {isPrimary && exam.status === "setup" && (
-            <>The admin hasn&apos;t started marking yet. You&apos;ll get an email when it&apos;s your turn.</>
+            <>The admin hasn&apos;t started marking yet. Once they click <em>Start primary marking</em>, you&apos;ll be able to enter grades here.</>
           )}
           {isPrimary && exam.status === "secondary_marking" && (
             <>You have completed your marking. The second marker is now reviewing a sample.</>
           )}
-          {isSecondary && exam.status === "primary_marking" && (
-            <>The primary marker is still working. You&apos;ll get an email once a sample is ready for second marking.</>
+          {isSecondary && (exam.status === "setup" || exam.status === "primary_marking") && (
+            <>The primary marker is still working. You&apos;ll be able to start second-marking once a sample is ready.</>
           )}
           {(exam.status === "complete" || exam.status === "review") && (
             <>This exam is closed for marker edits.</>
@@ -124,7 +114,7 @@ export default async function MarkerExamPage({
           <form
             action={async (fd) => {
               "use server";
-              await setGradeBySeatAction(exam.id, fd);
+              await setGradeBySeatByTokenAction(examId, token, fd);
             }}
             className="mt-3 flex flex-wrap gap-2"
           >
@@ -182,9 +172,10 @@ export default async function MarkerExamPage({
               </tr>
             )}
             {rows.map((s) => {
-              const currentValue = isSecondary
-                ? (s.secondary_grade ?? "")
-                : (s.grade ?? "");
+              const currentValue =
+                isSecondary && "secondary_grade" in s
+                  ? (s.secondary_grade ?? "")
+                  : (s.grade ?? "");
               return (
                 <tr key={s.id} className="border-b last:border-b-0">
                   <td className="px-4 py-2 font-mono">{s.seat_number}</td>
@@ -198,7 +189,7 @@ export default async function MarkerExamPage({
                       <form
                         action={async (fd) => {
                           "use server";
-                          await setGradeAction(exam.id, s.id, fd);
+                          await setGradeByTokenAction(examId, token, s.id, fd);
                         }}
                         className="flex gap-2"
                       >
@@ -232,7 +223,7 @@ export default async function MarkerExamPage({
             <form
               action={async () => {
                 "use server";
-                await completePrimaryMarkingAction(exam.id);
+                await completePrimaryMarkingByTokenAction(examId, token);
               }}
             >
               <button
@@ -243,16 +234,16 @@ export default async function MarkerExamPage({
                 Marking is complete
               </button>
               <p className="mt-2 text-xs text-slate-500">
-                Locks in your grades, picks the second-marking sample (boundary
-                grades plus a random fill of at least 10% of papers), and emails
-                the second marker.
+                Locks in your grades and picks the second-marking sample
+                (boundary grades plus a random fill of at least 10% of papers).
+                Share the second-marker URL with the second marker.
               </p>
             </form>
           ) : (
             <form
               action={async () => {
                 "use server";
-                await completeSecondaryMarkingAction(exam.id);
+                await completeSecondaryMarkingByTokenAction(examId, token);
               }}
             >
               <button
@@ -263,8 +254,8 @@ export default async function MarkerExamPage({
                 Marking is complete
               </button>
               <p className="mt-2 text-xs text-slate-500">
-                Locks in your grades. The admin is notified if any of your
-                grades differ from the primary marker&apos;s.
+                Locks in your grades. The exam goes to <em>Requires Review</em>
+                {" "}if any of your grades differ from the primary marker&apos;s.
               </p>
             </form>
           )}

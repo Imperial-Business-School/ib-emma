@@ -11,9 +11,7 @@ export default async function LoginPage({
 }) {
   const sp = await searchParams;
   const user = await getCurrentUser();
-  if (user) {
-    redirect(user.role === "admin" ? "/admin" : "/marker");
-  }
+  if (user) redirect("/admin");
 
   if (sp.sent === "1") {
     return (

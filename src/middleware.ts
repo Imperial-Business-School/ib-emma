@@ -11,9 +11,7 @@ function getSecret(): Uint8Array | null {
 
 export async function middleware(req: NextRequest) {
   const { pathname, search } = req.nextUrl;
-  const isAdmin = pathname.startsWith("/admin");
-  const isMarker = pathname.startsWith("/marker");
-  if (!isAdmin && !isMarker) return NextResponse.next();
+  if (!pathname.startsWith("/admin")) return NextResponse.next();
 
   const secret = getSecret();
   const cookie = req.cookies.get(SESSION_COOKIE)?.value;
@@ -35,10 +33,10 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  if (isAdmin && role !== "admin") {
+  if (role !== "admin") {
     const url = req.nextUrl.clone();
-    url.pathname = "/marker";
-    url.search = "";
+    url.pathname = "/login";
+    url.search = "?error=admin_only";
     return NextResponse.redirect(url);
   }
 
@@ -46,5 +44,5 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/marker/:path*"],
+  matcher: ["/admin/:path*"],
 };

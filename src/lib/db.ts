@@ -1,4 +1,5 @@
 import { Pool, type QueryResultRow } from "pg";
+import crypto from "node:crypto";
 
 declare global {
   // eslint-disable-next-line no-var
@@ -91,11 +92,37 @@ async function initSchema(): Promise<void> {
     ALTER TABLE exams ADD COLUMN IF NOT EXISTS secondary_marker_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
     ALTER TABLE exams ADD COLUMN IF NOT EXISTS primary_completed_at TIMESTAMPTZ;
     ALTER TABLE exams ADD COLUMN IF NOT EXISTS secondary_completed_at TIMESTAMPTZ;
+    ALTER TABLE exams ADD COLUMN IF NOT EXISTS primary_access_token TEXT;
+    ALTER TABLE exams ADD COLUMN IF NOT EXISTS secondary_access_token TEXT;
 
     ALTER TABLE submissions ADD COLUMN IF NOT EXISTS secondary_grade TEXT;
     ALTER TABLE submissions ADD COLUMN IF NOT EXISTS secondary_graded_at TIMESTAMPTZ;
     ALTER TABLE submissions ADD COLUMN IF NOT EXISTS in_sample BOOLEAN NOT NULL DEFAULT false;
   `);
+
+  // Backfill access tokens for exams created before the URL-share workflow.
+  const missing = await pool.query<{ id: number }>(
+    "SELECT id FROM exams WHERE primary_access_token IS NULL OR secondary_access_token IS NULL",
+  );
+  for (const row of missing.rows) {
+    await pool.query(
+      `UPDATE exams
+       SET primary_access_token = COALESCE(primary_access_token, $2),
+           secondary_access_token = COALESCE(secondary_access_token, $3)
+       WHERE id = $1`,
+      [row.id, randomToken(), randomToken()],
+    );
+  }
+
+  await pool.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_exams_primary_token ON exams(primary_access_token);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_exams_secondary_token ON exams(secondary_access_token);
+  `);
+}
+
+export function randomToken(): string {
+  // 16 bytes = 32 hex chars, ~128 bits of entropy
+  return crypto.randomBytes(16).toString("hex");
 }
 
 async function ensureReady(): Promise<void> {
@@ -142,6 +169,8 @@ export type Exam = {
   secondary_marker_id: number | null;
   primary_completed_at: string | null;
   secondary_completed_at: string | null;
+  primary_access_token: string | null;
+  secondary_access_token: string | null;
 };
 
 export type Submission = {

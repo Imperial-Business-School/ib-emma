@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import {
   EXAM_STATUS_LABEL,
@@ -13,12 +14,20 @@ import {
   deleteExamAction,
   deleteSeatAction,
   reassignMarkerAction,
+  regenerateMarkerTokenAction,
   resolveReviewAction,
   startPrimaryMarkingAction,
   uploadSeatsAction,
 } from "../../actions";
 
 export const dynamic = "force-dynamic";
+
+async function getOrigin(): Promise<string> {
+  const h = await headers();
+  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000";
+  const proto = h.get("x-forwarded-proto") ?? "https";
+  return `${proto}://${host}`;
+}
 
 export default async function AdminExamPage({
   params,
@@ -33,6 +42,14 @@ export default async function AdminExamPage({
     examId,
   ]);
   if (!exam) notFound();
+
+  const origin = await getOrigin();
+  const primaryUrl = exam.primary_access_token
+    ? `${origin}/m/${exam.id}/${exam.primary_access_token}`
+    : null;
+  const secondaryUrl = exam.secondary_access_token
+    ? `${origin}/m/${exam.id}/${exam.secondary_access_token}`
+    : null;
 
   const submissions = await query<Submission>(
     "SELECT * FROM submissions WHERE exam_id = $1 ORDER BY seat_number",
@@ -140,12 +157,16 @@ export default async function AdminExamPage({
           examId={exam.id}
           marker={primaryMarker}
           completedAt={exam.primary_completed_at}
+          shareUrl={primaryUrl}
+          status={exam.status}
         />
         <MarkerCard
           role="secondary"
           examId={exam.id}
           marker={secondaryMarker}
           completedAt={exam.secondary_completed_at}
+          shareUrl={secondaryUrl}
+          status={exam.status}
         />
       </section>
 
@@ -327,18 +348,45 @@ function MarkerCard({
   examId,
   marker,
   completedAt,
+  shareUrl,
+  status,
 }: {
   role: "primary" | "secondary";
   examId: number;
   marker: User | null;
   completedAt: string | null;
+  shareUrl: string | null;
+  status: Exam["status"];
 }) {
   const heading = role === "primary" ? "Primary marker" : "Second marker";
+  const activeNow =
+    (role === "primary" && status === "primary_marking") ||
+    (role === "secondary" && status === "secondary_marking");
+  const hint =
+    role === "primary"
+      ? status === "setup"
+        ? "Send once you click Start primary marking."
+        : status === "primary_marking"
+          ? "Send this URL to the primary marker."
+          : "Primary marking is finished."
+      : status === "setup" || status === "primary_marking"
+        ? "Send once the primary marker has finished."
+        : status === "secondary_marking"
+          ? "Send this URL to the second marker."
+          : "Second marking is finished.";
+
   return (
     <div className="rounded-lg border bg-white p-4 shadow-sm">
-      <p className="text-xs font-semibold uppercase text-slate-500">
-        {heading}
-      </p>
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-semibold uppercase text-slate-500">
+          {heading}
+        </p>
+        {activeNow && (
+          <span className="rounded bg-blue-100 px-1.5 py-0.5 text-xs font-medium text-blue-800">
+            Active
+          </span>
+        )}
+      </div>
       {marker ? (
         <>
           <p className="mt-1 font-medium">{marker.name ?? marker.email}</p>
@@ -354,9 +402,41 @@ function MarkerCard({
       ) : (
         <p className="mt-1 text-sm text-slate-400">Not set</p>
       )}
+
+      {shareUrl && (
+        <div className="mt-3">
+          <p className="text-xs text-slate-500">Marker URL</p>
+          <input
+            readOnly
+            value={shareUrl}
+            className="mt-1 w-full rounded border bg-slate-50 px-2 py-1 font-mono text-xs"
+          />
+          <p className="mt-1 text-xs text-slate-500">{hint}</p>
+          <details className="mt-2 text-xs text-slate-600">
+            <summary className="cursor-pointer hover:text-slate-900">
+              Regenerate URL (invalidates the previous link)
+            </summary>
+            <form
+              action={async () => {
+                "use server";
+                await regenerateMarkerTokenAction(examId, role);
+              }}
+              className="mt-2"
+            >
+              <button
+                type="submit"
+                className="rounded border bg-white px-2 py-1 text-xs hover:bg-slate-50"
+              >
+                Regenerate
+              </button>
+            </form>
+          </details>
+        </div>
+      )}
+
       <details className="mt-3 text-xs text-slate-600">
         <summary className="cursor-pointer hover:text-slate-900">
-          Reassign
+          Reassign marker
         </summary>
         <form
           action={async (fd) => {

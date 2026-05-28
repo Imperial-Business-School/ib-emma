@@ -20,10 +20,6 @@ export async function GET(req: Request) {
   await createSessionCookie(user);
 
   const dest =
-    next && next.startsWith("/") && !next.startsWith("//")
-      ? next
-      : user.role === "admin"
-        ? "/admin"
-        : "/marker";
+    next && next.startsWith("/") && !next.startsWith("//") ? next : "/admin";
   return NextResponse.redirect(new URL(dest, url));
 }

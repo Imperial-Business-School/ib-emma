@@ -2,15 +2,9 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import {
-  createMagicLinkToken,
-  findOrCreateUser,
-  getAppUrl,
-  getCurrentUser,
-} from "@/lib/auth";
-import { query, queryOne, type Exam } from "@/lib/db";
+import { findOrCreateUser, getCurrentUser } from "@/lib/auth";
+import { query, queryOne, randomToken, type Exam } from "@/lib/db";
 import { parseCsv } from "@/lib/csv";
-import { sendMagicLinkEmail } from "@/lib/email";
 
 async function assertAdmin(): Promise<void> {
   const user = await getCurrentUser();
@@ -48,10 +42,12 @@ export async function createExamAction(formData: FormData) {
   const secondary = await findOrCreateUser(secondaryEmail, secondaryName);
 
   const row = await queryOne<{ id: number }>(
-    `INSERT INTO exams (name, code, primary_marker_id, secondary_marker_id, status)
-     VALUES ($1, $2, $3, $4, 'setup')
+    `INSERT INTO exams
+       (name, code, primary_marker_id, secondary_marker_id, status,
+        primary_access_token, secondary_access_token)
+     VALUES ($1, $2, $3, $4, 'setup', $5, $6)
      RETURNING id`,
-    [name, code, primary.id, secondary.id],
+    [name, code, primary.id, secondary.id, randomToken(), randomToken()],
   );
   if (!row) throw new Error("Failed to create exam");
 
@@ -182,25 +178,25 @@ export async function startPrimaryMarkingAction(examId: number) {
     throw new Error("Upload seat numbers before starting marking");
   }
 
-  const primary = await queryOne<{ id: number; email: string }>(
-    "SELECT id, email FROM users WHERE id = $1",
-    [exam.primary_marker_id],
-  );
-  if (!primary) throw new Error("Primary marker not found");
-
   await query(
     "UPDATE exams SET status = 'primary_marking' WHERE id = $1",
     [examId],
   );
 
-  const token = await createMagicLinkToken(primary.id);
-  const link = `${getAppUrl()}/api/auth/verify?token=${encodeURIComponent(token)}&next=${encodeURIComponent(`/marker/exams/${examId}`)}`;
-  try {
-    await sendMagicLinkEmail(primary.email, link, { examName: exam.name });
-  } catch (err) {
-    console.error("Failed to email primary marker", err);
-  }
+  revalidatePath(`/admin/exams/${examId}`);
+}
 
+export async function regenerateMarkerTokenAction(
+  examId: number,
+  role: "primary" | "secondary",
+) {
+  await assertAdmin();
+  const column =
+    role === "primary" ? "primary_access_token" : "secondary_access_token";
+  await query(`UPDATE exams SET ${column} = $1 WHERE id = $2`, [
+    randomToken(),
+    examId,
+  ]);
   revalidatePath(`/admin/exams/${examId}`);
 }
 
