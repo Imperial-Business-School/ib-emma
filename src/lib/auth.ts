@@ -92,15 +92,30 @@ export async function getCurrentUser(): Promise<User | null> {
   );
 }
 
+export type MarkerRole = "primary" | "secondary";
+
+export async function getMarkerRoleForExam(
+  userId: number,
+  examId: number,
+): Promise<MarkerRole | null> {
+  const row = await queryOne<{
+    primary_marker_id: number | null;
+    secondary_marker_id: number | null;
+  }>(
+    "SELECT primary_marker_id, secondary_marker_id FROM exams WHERE id = $1",
+    [examId],
+  );
+  if (!row) return null;
+  if (row.primary_marker_id === userId) return "primary";
+  if (row.secondary_marker_id === userId) return "secondary";
+  return null;
+}
+
 export async function canMarkExam(
   userId: number,
   examId: number,
 ): Promise<boolean> {
-  const row = await queryOne(
-    "SELECT 1 FROM exam_markers WHERE user_id = $1 AND exam_id = $2",
-    [userId, examId],
-  );
-  return Boolean(row);
+  return (await getMarkerRoleForExam(userId, examId)) !== null;
 }
 
 // Magic-link tokens

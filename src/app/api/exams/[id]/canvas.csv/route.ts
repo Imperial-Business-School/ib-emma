@@ -24,6 +24,12 @@ export async function GET(
     examId,
   ]);
   if (!exam) return new NextResponse("Exam not found", { status: 404 });
+  if (exam.status !== "complete" && exam.status !== "review") {
+    return new NextResponse(
+      "Canvas CSV is available once both markers complete",
+      { status: 409 },
+    );
+  }
 
   const submissions = await query<Submission>(
     `SELECT * FROM submissions

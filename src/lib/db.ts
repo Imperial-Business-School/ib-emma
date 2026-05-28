@@ -84,6 +84,17 @@ async function initSchema(): Promise<void> {
     );
 
     CREATE INDEX IF NOT EXISTS idx_auth_tokens_user ON auth_tokens(user_id);
+
+    -- Two-marker workflow additions.
+    ALTER TABLE exams ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'setup';
+    ALTER TABLE exams ADD COLUMN IF NOT EXISTS primary_marker_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
+    ALTER TABLE exams ADD COLUMN IF NOT EXISTS secondary_marker_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
+    ALTER TABLE exams ADD COLUMN IF NOT EXISTS primary_completed_at TIMESTAMPTZ;
+    ALTER TABLE exams ADD COLUMN IF NOT EXISTS secondary_completed_at TIMESTAMPTZ;
+
+    ALTER TABLE submissions ADD COLUMN IF NOT EXISTS secondary_grade TEXT;
+    ALTER TABLE submissions ADD COLUMN IF NOT EXISTS secondary_graded_at TIMESTAMPTZ;
+    ALTER TABLE submissions ADD COLUMN IF NOT EXISTS in_sample BOOLEAN NOT NULL DEFAULT false;
   `);
 }
 
@@ -114,11 +125,23 @@ export async function queryOne<T extends QueryResultRow = QueryResultRow>(
   return rows[0];
 }
 
+export type ExamStatus =
+  | "setup"
+  | "primary_marking"
+  | "secondary_marking"
+  | "complete"
+  | "review";
+
 export type Exam = {
   id: number;
   name: string;
   code: string | null;
   created_at: string;
+  status: ExamStatus;
+  primary_marker_id: number | null;
+  secondary_marker_id: number | null;
+  primary_completed_at: string | null;
+  secondary_completed_at: string | null;
 };
 
 export type Submission = {
@@ -128,6 +151,17 @@ export type Submission = {
   cid: string;
   grade: string | null;
   graded_at: string | null;
+  secondary_grade: string | null;
+  secondary_graded_at: string | null;
+  in_sample: boolean;
+};
+
+export const EXAM_STATUS_LABEL: Record<ExamStatus, string> = {
+  setup: "Setup",
+  primary_marking: "Primary marking in progress",
+  secondary_marking: "Secondary marking in progress",
+  complete: "Ready for Canvas upload",
+  review: "Requires Review",
 };
 
 export type Role = "admin" | "marker";

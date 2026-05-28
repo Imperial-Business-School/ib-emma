@@ -1,15 +1,15 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { canMarkExam, getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, getMarkerRoleForExam } from "@/lib/auth";
 import { query, queryOne, type Exam, type Submission } from "@/lib/db";
-import { setGradeAction, setGradeBySeatAction } from "../../actions";
+import {
+  completePrimaryMarkingAction,
+  completeSecondaryMarkingAction,
+  setGradeAction,
+  setGradeBySeatAction,
+} from "../../actions";
 
 export const dynamic = "force-dynamic";
-
-type MarkerSubmission = Pick<
-  Submission,
-  "id" | "seat_number" | "grade" | "graded_at"
->;
 
 export default async function MarkerExamPage({
   params,
@@ -28,23 +28,62 @@ export default async function MarkerExamPage({
   ]);
   if (!exam) notFound();
 
-  // Admins can view any exam; markers must be allocated.
-  if (user.role !== "admin") {
-    const allowed = await canMarkExam(user.id, examId);
-    if (!allowed) notFound();
-  }
+  const role =
+    user.role === "admin"
+      ? "admin"
+      : await getMarkerRoleForExam(user.id, examId);
+  if (role === null) notFound();
 
-  // Marker query: deliberately excludes the cid column.
-  const submissions = await query<MarkerSubmission>(
-    `SELECT id, seat_number, grade, graded_at
-     FROM submissions
-     WHERE exam_id = $1
-     ORDER BY seat_number`,
-    [examId],
-  );
+  // Primary marker (and admin) see every seat; secondary sees only sampled seats.
+  const rows =
+    role === "secondary"
+      ? await query<
+          Pick<
+            Submission,
+            | "id"
+            | "seat_number"
+            | "grade"
+            | "secondary_grade"
+            | "secondary_graded_at"
+            | "in_sample"
+          >
+        >(
+          `SELECT id, seat_number, grade, secondary_grade, secondary_graded_at, in_sample
+           FROM submissions
+           WHERE exam_id = $1 AND in_sample = true
+           ORDER BY seat_number`,
+          [examId],
+        )
+      : await query<
+          Pick<
+            Submission,
+            | "id"
+            | "seat_number"
+            | "grade"
+            | "graded_at"
+            | "secondary_grade"
+            | "in_sample"
+          >
+        >(
+          `SELECT id, seat_number, grade, graded_at, secondary_grade, in_sample
+           FROM submissions
+           WHERE exam_id = $1
+           ORDER BY seat_number`,
+          [examId],
+        );
 
-  const total = submissions.length;
-  const graded = submissions.filter((s) => s.grade !== null).length;
+  const isPrimary = role === "primary";
+  const isSecondary = role === "secondary";
+
+  const markingOpen =
+    (isPrimary && exam.status === "primary_marking") ||
+    (isSecondary && exam.status === "secondary_marking");
+
+  const total = rows.length;
+  const graded = isSecondary
+    ? rows.filter((r) => r.secondary_grade !== null).length
+    : rows.filter((r) => r.grade !== null).length;
+  const canComplete = markingOpen && total > 0 && graded === total;
 
   return (
     <div className="space-y-8">
@@ -54,104 +93,186 @@ export default async function MarkerExamPage({
         </Link>
         <h1 className="mt-1 text-2xl font-bold">{exam.name}</h1>
         {exam.code && <p className="text-sm text-slate-600">{exam.code}</p>}
-        <p className="mt-1 text-sm text-slate-600">
-          {graded} of {total} graded
+        <p className="mt-2 text-sm text-slate-600">
+          You are the{" "}
+          <strong>{isSecondary ? "second" : "primary"} marker</strong>.{" "}
+          {graded} of {total}{" "}
+          {isSecondary ? "sampled seats" : "seats"} graded.
         </p>
       </div>
 
-      <section className="rounded-lg border bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-semibold">Quick entry</h2>
-        <p className="mt-1 text-sm text-slate-600">
-          Type a seat number and grade, then press Enter. Useful when working
-          through a stack of papers.
-        </p>
-        <form
-          action={async (fd) => {
-            "use server";
-            await setGradeBySeatAction(exam.id, fd);
-          }}
-          className="mt-3 flex flex-wrap gap-2"
-        >
-          <input
-            name="seat"
-            placeholder="Seat"
-            required
-            autoFocus
-            className="w-32 rounded border px-3 py-2 text-sm font-mono"
-          />
-          <input
-            name="grade"
-            placeholder="Grade"
-            required
-            className="w-32 rounded border px-3 py-2 text-sm"
-          />
-          <button
-            type="submit"
-            className="rounded bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-700"
+      {!markingOpen && (
+        <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+          {isPrimary && exam.status === "setup" && (
+            <>The admin hasn&apos;t started marking yet. You&apos;ll get an email when it&apos;s your turn.</>
+          )}
+          {isPrimary && exam.status === "secondary_marking" && (
+            <>You have completed your marking. The second marker is now reviewing a sample.</>
+          )}
+          {isSecondary && exam.status === "primary_marking" && (
+            <>The primary marker is still working. You&apos;ll get an email once a sample is ready for second marking.</>
+          )}
+          {(exam.status === "complete" || exam.status === "review") && (
+            <>This exam is closed for marker edits.</>
+          )}
+        </div>
+      )}
+
+      {markingOpen && (
+        <section className="rounded-lg border bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-semibold">Quick entry</h2>
+          <p className="mt-1 text-sm text-slate-600">
+            Type a seat number and grade, then press Enter.
+          </p>
+          <form
+            action={async (fd) => {
+              "use server";
+              await setGradeBySeatAction(exam.id, fd);
+            }}
+            className="mt-3 flex flex-wrap gap-2"
           >
-            Save
-          </button>
-        </form>
-      </section>
+            <input
+              name="seat"
+              placeholder="Seat"
+              required
+              autoFocus
+              className="w-32 rounded border px-3 py-2 text-sm font-mono"
+            />
+            <input
+              name="grade"
+              placeholder="Grade"
+              required
+              className="w-32 rounded border px-3 py-2 text-sm"
+            />
+            <button
+              type="submit"
+              className="rounded bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-700"
+            >
+              Save
+            </button>
+          </form>
+        </section>
+      )}
 
       <section className="rounded-lg border bg-white shadow-sm">
         <div className="border-b px-4 py-3">
-          <h2 className="text-lg font-semibold">All seats</h2>
-          <p className="text-xs text-slate-500">
-            CIDs are hidden from markers.
-          </p>
+          <h2 className="text-lg font-semibold">
+            {isSecondary ? "Sampled seats" : "All seats"}
+          </h2>
+          <p className="text-xs text-slate-500">CIDs are hidden from markers.</p>
         </div>
         <table className="w-full text-sm">
           <thead className="border-b bg-slate-50 text-left text-slate-600">
             <tr>
               <th className="px-4 py-2 w-1/4">Seat</th>
-              <th className="px-4 py-2">Grade</th>
-              <th className="px-4 py-2 w-1/4">Last saved</th>
+              {isSecondary && <th className="px-4 py-2">Primary grade</th>}
+              <th className="px-4 py-2">
+                {isSecondary ? "Your grade" : "Grade"}
+              </th>
             </tr>
           </thead>
           <tbody>
-            {submissions.length === 0 && (
+            {rows.length === 0 && (
               <tr>
-                <td colSpan={3} className="px-4 py-8 text-center text-slate-500">
-                  No seats uploaded for this exam yet.
+                <td
+                  colSpan={isSecondary ? 3 : 2}
+                  className="px-4 py-8 text-center text-slate-500"
+                >
+                  {isSecondary
+                    ? "No sample available yet."
+                    : "No seats uploaded for this exam yet."}
                 </td>
               </tr>
             )}
-            {submissions.map((s) => (
-              <tr key={s.id} className="border-b last:border-b-0">
-                <td className="px-4 py-2 font-mono">{s.seat_number}</td>
-                <td className="px-4 py-2">
-                  <form
-                    action={async (fd) => {
-                      "use server";
-                      await setGradeAction(exam.id, s.id, fd);
-                    }}
-                    className="flex gap-2"
-                  >
-                    <input
-                      name="grade"
-                      defaultValue={s.grade ?? ""}
-                      placeholder="—"
-                      className="w-32 rounded border px-2 py-1 text-sm"
-                    />
-                    <button
-                      type="submit"
-                      className="rounded border bg-white px-2 py-1 text-xs hover:bg-slate-50"
-                    >
-                      Save
-                    </button>
-                  </form>
-                </td>
-                <td className="px-4 py-2 text-slate-600">
-                  {s.graded_at
-                    ? new Date(s.graded_at).toLocaleString()
-                    : "—"}
-                </td>
-              </tr>
-            ))}
+            {rows.map((s) => {
+              const currentValue = isSecondary
+                ? (s.secondary_grade ?? "")
+                : (s.grade ?? "");
+              return (
+                <tr key={s.id} className="border-b last:border-b-0">
+                  <td className="px-4 py-2 font-mono">{s.seat_number}</td>
+                  {isSecondary && (
+                    <td className="px-4 py-2 font-mono text-slate-700">
+                      {s.grade ?? "—"}
+                    </td>
+                  )}
+                  <td className="px-4 py-2">
+                    {markingOpen ? (
+                      <form
+                        action={async (fd) => {
+                          "use server";
+                          await setGradeAction(exam.id, s.id, fd);
+                        }}
+                        className="flex gap-2"
+                      >
+                        <input
+                          name="grade"
+                          defaultValue={currentValue}
+                          placeholder="—"
+                          className="w-32 rounded border px-2 py-1 text-sm"
+                        />
+                        <button
+                          type="submit"
+                          className="rounded border bg-white px-2 py-1 text-xs hover:bg-slate-50"
+                        >
+                          Save
+                        </button>
+                      </form>
+                    ) : (
+                      <span className="font-mono">{currentValue || "—"}</span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </section>
+
+      {markingOpen && (
+        <section className="rounded-lg border bg-white p-6 shadow-sm">
+          {isPrimary ? (
+            <form
+              action={async () => {
+                "use server";
+                await completePrimaryMarkingAction(exam.id);
+              }}
+            >
+              <button
+                type="submit"
+                disabled={!canComplete}
+                className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+              >
+                Marking is complete
+              </button>
+              <p className="mt-2 text-xs text-slate-500">
+                Locks in your grades, picks the second-marking sample (boundary
+                grades plus a random fill of at least 10% of papers), and emails
+                the second marker.
+              </p>
+            </form>
+          ) : (
+            <form
+              action={async () => {
+                "use server";
+                await completeSecondaryMarkingAction(exam.id);
+              }}
+            >
+              <button
+                type="submit"
+                disabled={!canComplete}
+                className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+              >
+                Marking is complete
+              </button>
+              <p className="mt-2 text-xs text-slate-500">
+                Locks in your grades. The admin is notified if any of your
+                grades differ from the primary marker&apos;s.
+              </p>
+            </form>
+          )}
+        </section>
+      )}
     </div>
   );
 }
