@@ -25,11 +25,6 @@ async function assertMarkerForExam(examId: number): Promise<AccessContext> {
     examId,
   ]);
   if (!exam) throw new Error("Exam not found");
-  if (user.role === "admin") {
-    throw new Error(
-      "Admins cannot enter marker grades — sign in as the assigned marker",
-    );
-  }
   const role = await getMarkerRoleForExam(user.id, examId);
   if (!role) throw new Error("Not allocated to this exam");
   return { examId, exam, role };

@@ -28,10 +28,7 @@ export default async function MarkerExamPage({
   ]);
   if (!exam) notFound();
 
-  const role =
-    user.role === "admin"
-      ? "admin"
-      : await getMarkerRoleForExam(user.id, examId);
+  const role = await getMarkerRoleForExam(user.id, examId);
   if (role === null) notFound();
 
   // Primary marker (and admin) see every seat; secondary sees only sampled seats.
