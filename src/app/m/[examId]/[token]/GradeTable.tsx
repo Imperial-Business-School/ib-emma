@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { saveGradesByTokenAction } from "./actions";
 
 export type GradeRow = {
@@ -42,6 +42,33 @@ export function GradeTable({
   const [pendingIds, setPendingIds] = useState<Set<number>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
+
+  // When the parent server component re-renders with new rows (e.g. after the
+  // Quick Entry form above writes to the DB), sync the table's local state.
+  // We only update a row's input if the user hasn't typed something different
+  // from the last server value -- preserving any in-progress edits.
+  const lastServerRowsRef = useRef<GradeRow[]>(rows);
+  useEffect(() => {
+    const prev = new Map(lastServerRowsRef.current.map((r) => [r.id, r]));
+    setValues((current) => {
+      const next = { ...current };
+      for (const r of rows) {
+        const previousServer = prev.get(r.id)?.current_grade ?? "";
+        const newServer = r.current_grade ?? "";
+        // Add brand-new rows, and refresh rows the user hasn't touched.
+        if (!(r.id in current) || current[r.id] === previousServer) {
+          next[r.id] = newServer;
+        }
+      }
+      return next;
+    });
+    setSavedAt((current) => {
+      const next = { ...current };
+      for (const r of rows) next[r.id] = r.saved_at;
+      return next;
+    });
+    lastServerRowsRef.current = rows;
+  }, [rows]);
 
   function persist(ids: number[]): void {
     if (ids.length === 0) return;
