@@ -15,7 +15,7 @@ import {
   deleteSeatAction,
   reassignMarkerAction,
   regenerateMarkerTokenAction,
-  resolveReviewAction,
+  setFinalGradeAction,
   startPrimaryMarkingAction,
   uploadSeatsAction,
 } from "../../actions";
@@ -72,12 +72,14 @@ export default async function AdminExamPage({
   const secondaryGraded = submissions.filter(
     (s) => s.in_sample && s.secondary_grade !== null,
   ).length;
-  const discrepancies = submissions.filter(
-    (s) => s.in_sample && s.grade !== s.secondary_grade,
+  const showFinalColumn =
+    exam.status === "complete" || exam.status === "review";
+  const unresolved = submissions.filter(
+    (s) => showFinalColumn && s.final_grade === null,
   );
   const canStartMarking =
     exam.status === "setup" && totalSeats > 0 && exam.primary_marker_id;
-  const canDownloadCsv = exam.status === "complete" || exam.status === "review";
+  const canDownloadCsv = exam.status === "complete";
 
   return (
     <div className="space-y-8">
@@ -127,27 +129,13 @@ export default async function AdminExamPage({
       {exam.status === "review" && (
         <div className="rounded-lg border border-amber-300 bg-amber-50 p-4">
           <h3 className="font-semibold text-amber-900">
-            {discrepancies.length} discrepanc
-            {discrepancies.length === 1 ? "y" : "ies"} between markers
+            {unresolved.length} discrepanc{unresolved.length === 1 ? "y" : "ies"} of 6 points
+            or more
           </h3>
           <p className="mt-1 text-sm text-amber-800">
-            Reconcile out-of-band with the markers, then mark as resolved to
-            enable the Canvas CSV download.
+            Enter a Final Grade for each highlighted row below. Once every
+            seat has a Final Grade, the exam is ready for Canvas upload.
           </p>
-          <form
-            action={async () => {
-              "use server";
-              await resolveReviewAction(exam.id);
-            }}
-            className="mt-3"
-          >
-            <button
-              type="submit"
-              className="rounded border border-amber-400 bg-white px-3 py-2 text-sm font-medium text-amber-900 hover:bg-amber-100"
-            >
-              Mark resolved → Ready for Canvas upload
-            </button>
-          </form>
         </div>
       )}
 
@@ -272,26 +260,36 @@ export default async function AdminExamPage({
               <th className="px-4 py-2">Primary grade</th>
               <th className="px-4 py-2">Sample</th>
               <th className="px-4 py-2">Secondary grade</th>
+              {showFinalColumn && <th className="px-4 py-2">Final grade</th>}
               <th className="px-4 py-2" />
             </tr>
           </thead>
           <tbody>
             {submissions.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-slate-500">
+                <td
+                  colSpan={showFinalColumn ? 7 : 6}
+                  className="px-4 py-8 text-center text-slate-500"
+                >
                   No seats uploaded yet.
                 </td>
               </tr>
             )}
             {submissions.map((s) => {
+              const needsAdmin = showFinalColumn && s.final_grade === null;
               const mismatch =
                 s.in_sample && s.grade !== null && s.secondary_grade !== null
                   ? s.grade !== s.secondary_grade
                   : false;
+              const rowClass = needsAdmin
+                ? "bg-amber-100"
+                : mismatch
+                  ? "bg-amber-50"
+                  : "";
               return (
                 <tr
                   key={s.id}
-                  className={`border-b last:border-b-0 ${mismatch ? "bg-amber-50" : ""}`}
+                  className={`border-b last:border-b-0 ${rowClass}`}
                 >
                   <td className="px-4 py-2 font-mono">{s.seat_number}</td>
                   <td className="px-4 py-2 font-mono">{s.cid}</td>
@@ -303,19 +301,45 @@ export default async function AdminExamPage({
                   </td>
                   <td className="px-4 py-2">
                     {s.in_sample ? (
-                      mismatch ? (
-                        <span className="font-medium text-amber-900">
-                          {s.secondary_grade}
-                        </span>
-                      ) : (
-                        (s.secondary_grade ?? (
-                          <span className="text-slate-400">—</span>
-                        ))
-                      )
+                      (s.secondary_grade ?? (
+                        <span className="text-slate-400">—</span>
+                      ))
                     ) : (
                       <span className="text-slate-300">n/a</span>
                     )}
                   </td>
+                  {showFinalColumn && (
+                    <td className="px-4 py-2">
+                      {needsAdmin ? (
+                        <form
+                          action={async (fd) => {
+                            "use server";
+                            await setFinalGradeAction(exam.id, s.id, fd);
+                          }}
+                          className="flex gap-2"
+                        >
+                          <input
+                            name="final_grade"
+                            required
+                            placeholder="enter"
+                            className="w-24 rounded border border-amber-400 px-2 py-1 text-sm"
+                          />
+                          <button
+                            type="submit"
+                            className="rounded border bg-white px-2 py-1 text-xs hover:bg-slate-50"
+                          >
+                            Save
+                          </button>
+                        </form>
+                      ) : (
+                        <span className="font-medium">
+                          {s.final_grade ?? (
+                            <span className="text-slate-400">—</span>
+                          )}
+                        </span>
+                      )}
+                    </td>
+                  )}
                   <td className="px-4 py-2 text-right">
                     {exam.status === "setup" && (
                       <form

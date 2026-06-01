@@ -200,11 +200,37 @@ export async function regenerateMarkerTokenAction(
   revalidatePath(`/admin/exams/${examId}`);
 }
 
-export async function resolveReviewAction(examId: number) {
+export async function setFinalGradeAction(
+  examId: number,
+  submissionId: number,
+  formData: FormData,
+) {
   await assertAdmin();
-  await query(
-    "UPDATE exams SET status = 'complete' WHERE id = $1 AND status = 'review'",
+  const raw = String(formData.get("final_grade") ?? "").trim();
+  if (raw === "") {
+    await query(
+      "UPDATE submissions SET final_grade = NULL WHERE id = $1 AND exam_id = $2",
+      [submissionId, examId],
+    );
+  } else {
+    await query(
+      "UPDATE submissions SET final_grade = $1 WHERE id = $2 AND exam_id = $3",
+      [raw, submissionId, examId],
+    );
+  }
+
+  // If every submission for this exam now has a final grade, flip status to
+  // 'complete'. Otherwise drop back to 'review' if it was previously complete.
+  const remaining = await queryOne<{ n: number }>(
+    "SELECT COUNT(*)::int AS n FROM submissions WHERE exam_id = $1 AND final_grade IS NULL",
     [examId],
   );
+  const unresolved = remaining?.n ?? 0;
+  await query(
+    `UPDATE exams SET status = $1
+     WHERE id = $2 AND status IN ('complete','review')`,
+    [unresolved === 0 ? "complete" : "review", examId],
+  );
+
   revalidatePath(`/admin/exams/${examId}`);
 }

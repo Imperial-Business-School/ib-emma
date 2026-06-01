@@ -98,6 +98,7 @@ async function initSchema(): Promise<void> {
     ALTER TABLE submissions ADD COLUMN IF NOT EXISTS secondary_grade TEXT;
     ALTER TABLE submissions ADD COLUMN IF NOT EXISTS secondary_graded_at TIMESTAMPTZ;
     ALTER TABLE submissions ADD COLUMN IF NOT EXISTS in_sample BOOLEAN NOT NULL DEFAULT false;
+    ALTER TABLE submissions ADD COLUMN IF NOT EXISTS final_grade TEXT;
   `);
 
   // Backfill access tokens for exams created before the URL-share workflow.
@@ -183,6 +184,7 @@ export type Submission = {
   secondary_grade: string | null;
   secondary_graded_at: string | null;
   in_sample: boolean;
+  final_grade: string | null;
 };
 
 export const EXAM_STATUS_LABEL: Record<ExamStatus, string> = {

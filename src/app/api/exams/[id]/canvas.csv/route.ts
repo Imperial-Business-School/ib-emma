@@ -24,16 +24,16 @@ export async function GET(
     examId,
   ]);
   if (!exam) return new NextResponse("Exam not found", { status: 404 });
-  if (exam.status !== "complete" && exam.status !== "review") {
+  if (exam.status !== "complete") {
     return new NextResponse(
-      "Canvas CSV is available once both markers complete",
+      "Canvas CSV is available once every seat has a final grade",
       { status: 409 },
     );
   }
 
   const submissions = await query<Submission>(
     `SELECT * FROM submissions
-     WHERE exam_id = $1 AND grade IS NOT NULL
+     WHERE exam_id = $1 AND final_grade IS NOT NULL
      ORDER BY cid`,
     [examId],
   );
@@ -53,7 +53,7 @@ export async function GET(
   ];
   const rows: (string | number | null)[][] = [header];
   for (const s of submissions) {
-    rows.push(["", "", s.cid, "", "", s.grade]);
+    rows.push(["", "", s.cid, "", "", s.final_grade]);
   }
 
   const body = toCsv(rows) + "\n";

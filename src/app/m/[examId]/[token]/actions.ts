@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { query, queryOne, type Exam } from "@/lib/db";
+import { computeFinalGrade } from "@/lib/finalGrade";
 import { computeSampleIds } from "@/lib/sampling";
 
 type MarkerRole = "primary" | "secondary";
@@ -75,6 +76,75 @@ export async function setGradeByTokenAction(
   const raw = String(formData.get("grade") ?? "").trim();
   await writeGrade(role, sub.id, raw);
   revalidatePath(`/m/${examId}/${token}`);
+}
+
+// Bulk save: client component sends every (id, grade) it wants to update in
+// one call. Returns the new DB timestamp per row so the client can show
+// "Saved at HH:MM:SS".
+export async function saveGradesByTokenAction(
+  examId: number,
+  token: string,
+  updates: { id: number; grade: string }[],
+): Promise<{ id: number; saved_at: string | null }[]> {
+  const { exam, role } = await authorize(examId, token);
+  if (exam.status !== expectedMarkerStatusFor(role)) {
+    throw new Error("Marking is not currently open for you on this exam");
+  }
+
+  // Validate that every submitted row belongs to this exam, and that
+  // secondary marker only touches sampled seats.
+  const ids = updates.map((u) => u.id);
+  if (ids.length === 0) return [];
+  const rows = await query<{ id: number; in_sample: boolean }>(
+    `SELECT id, in_sample FROM submissions
+     WHERE exam_id = $1 AND id = ANY($2::int[])`,
+    [examId, ids],
+  );
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  for (const u of updates) {
+    const row = byId.get(u.id);
+    if (!row) throw new Error(`Submission ${u.id} not found for this exam`);
+    if (role === "secondary" && !row.in_sample) {
+      throw new Error("One or more seats are not in the second-marking sample");
+    }
+  }
+
+  const results: { id: number; saved_at: string | null }[] = [];
+  for (const { id, grade } of updates) {
+    const raw = grade.trim();
+    if (role === "primary") {
+      if (raw === "") {
+        await query(
+          "UPDATE submissions SET grade = NULL, graded_at = NULL WHERE id = $1",
+          [id],
+        );
+        results.push({ id, saved_at: null });
+      } else {
+        const r = await queryOne<{ graded_at: string }>(
+          "UPDATE submissions SET grade = $1, graded_at = now() WHERE id = $2 RETURNING graded_at",
+          [raw, id],
+        );
+        results.push({ id, saved_at: r?.graded_at ?? null });
+      }
+    } else {
+      if (raw === "") {
+        await query(
+          "UPDATE submissions SET secondary_grade = NULL, secondary_graded_at = NULL WHERE id = $1",
+          [id],
+        );
+        results.push({ id, saved_at: null });
+      } else {
+        const r = await queryOne<{ secondary_graded_at: string }>(
+          "UPDATE submissions SET secondary_grade = $1, secondary_graded_at = now() WHERE id = $2 RETURNING secondary_graded_at",
+          [raw, id],
+        );
+        results.push({ id, saved_at: r?.secondary_graded_at ?? null });
+      }
+    }
+  }
+
+  revalidatePath(`/m/${examId}/${token}`);
+  return results;
 }
 
 async function writeGrade(
@@ -171,19 +241,34 @@ export async function completeSecondaryMarkingByTokenAction(
     );
   }
 
-  const disc = await queryOne<{ n: number }>(
-    `SELECT COUNT(*)::int AS n FROM submissions
-     WHERE exam_id = $1 AND in_sample = true
-       AND grade IS DISTINCT FROM secondary_grade`,
+  // Compute final grades. Non-sampled seats inherit the primary grade.
+  // Sampled seats with both grades and |diff| <= 5 get the average; larger
+  // discrepancies or non-numeric values are left null for admin to resolve.
+  const subs = await query<{
+    id: number;
+    grade: string | null;
+    secondary_grade: string | null;
+    in_sample: boolean;
+  }>(
+    `SELECT id, grade, secondary_grade, in_sample FROM submissions
+     WHERE exam_id = $1`,
     [examId],
   );
-  const hasDiscrepancies = (disc?.n ?? 0) > 0;
+  let unresolved = 0;
+  for (const s of subs) {
+    const { value } = computeFinalGrade(s.grade, s.secondary_grade, s.in_sample);
+    if (value === null) unresolved++;
+    await query("UPDATE submissions SET final_grade = $1 WHERE id = $2", [
+      value,
+      s.id,
+    ]);
+  }
 
   await query(
     `UPDATE exams
      SET status = $1, secondary_completed_at = now()
      WHERE id = $2`,
-    [hasDiscrepancies ? "review" : "complete", examId],
+    [unresolved > 0 ? "review" : "complete", examId],
   );
 
   revalidatePath(`/m/${examId}/${token}`);
