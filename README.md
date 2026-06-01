@@ -1,4 +1,4 @@
-# Anonymous Grading (CID-Seat)
+# Anonymous Exam Grading (CID-Seat)
 
 A small web app that replaces the email-spreadsheet workflow used for anonymous
 exam marking at university. Students write their **seat number** on their
