@@ -10,7 +10,7 @@ export default function AdminLayout({
       <header className="border-b bg-white">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
           <Link href="/admin" className="text-lg font-semibold">
-            Anonymous Exam Grading
+            IB Anonymous Exam Grading
           </Link>
         </div>
       </header>
