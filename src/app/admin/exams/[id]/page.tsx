@@ -52,7 +52,7 @@ export default async function AdminExamPage({
     : null;
 
   const submissions = await query<Submission>(
-    "SELECT * FROM submissions WHERE exam_id = $1 ORDER BY seat_number",
+    "SELECT * FROM submissions WHERE exam_id = $1 ORDER BY length(seat_number), seat_number",
     [examId],
   );
   const primaryMarker = exam.primary_marker_id

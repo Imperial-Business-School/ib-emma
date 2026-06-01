@@ -48,7 +48,7 @@ export default async function MarkerByTokenPage({
         `SELECT id, seat_number, grade, secondary_grade, secondary_graded_at, in_sample
          FROM submissions
          WHERE exam_id = $1 AND in_sample = true
-         ORDER BY seat_number`,
+         ORDER BY length(seat_number), seat_number`,
         [examId],
       )
     : await query<
@@ -60,7 +60,7 @@ export default async function MarkerByTokenPage({
         `SELECT id, seat_number, grade, graded_at, in_sample
          FROM submissions
          WHERE exam_id = $1
-         ORDER BY seat_number`,
+         ORDER BY length(seat_number), seat_number`,
         [examId],
       );
 
