@@ -2,16 +2,9 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { findOrCreateUser, getCurrentUser } from "@/lib/auth";
+import { findOrCreateUser } from "@/lib/auth";
 import { query, queryOne, randomToken, type Exam } from "@/lib/db";
 import { parseCsv } from "@/lib/csv";
-
-async function assertAdmin(): Promise<void> {
-  const user = await getCurrentUser();
-  if (!user || user.role !== "admin") {
-    throw new Error("Admin only");
-  }
-}
 
 function parseEmail(input: FormDataEntryValue | null): string {
   const e = String(input ?? "").trim().toLowerCase();
@@ -22,7 +15,6 @@ function parseEmail(input: FormDataEntryValue | null): string {
 }
 
 export async function createExamAction(formData: FormData) {
-  await assertAdmin();
   const name = String(formData.get("name") ?? "").trim();
   const code = String(formData.get("code") ?? "").trim() || null;
   if (!name) throw new Error("Exam name is required");
@@ -59,7 +51,6 @@ export async function reassignMarkerAction(
   role: "primary" | "secondary",
   formData: FormData,
 ) {
-  await assertAdmin();
   const email = parseEmail(formData.get("email"));
   const name = String(formData.get("name") ?? "").trim() || null;
 
@@ -88,7 +79,6 @@ export async function reassignMarkerAction(
 }
 
 export async function uploadSeatsAction(examId: number, formData: FormData) {
-  await assertAdmin();
   const file = formData.get("file");
   if (!(file instanceof File) || file.size === 0) {
     throw new Error("No file uploaded");
@@ -125,7 +115,6 @@ export async function uploadSeatsAction(examId: number, formData: FormData) {
 }
 
 export async function addSeatAction(examId: number, formData: FormData) {
-  await assertAdmin();
   const seat = String(formData.get("seat") ?? "").trim();
   const cid = String(formData.get("cid") ?? "").trim();
   if (!seat || !cid) return;
@@ -142,7 +131,6 @@ export async function addSeatAction(examId: number, formData: FormData) {
 }
 
 export async function deleteSeatAction(examId: number, submissionId: number) {
-  await assertAdmin();
   await query("DELETE FROM submissions WHERE id = $1 AND exam_id = $2", [
     submissionId,
     examId,
@@ -151,13 +139,11 @@ export async function deleteSeatAction(examId: number, submissionId: number) {
 }
 
 export async function deleteExamAction(examId: number) {
-  await assertAdmin();
   await query("DELETE FROM exams WHERE id = $1", [examId]);
   redirect("/admin");
 }
 
 export async function startPrimaryMarkingAction(examId: number) {
-  await assertAdmin();
 
   const exam = await queryOne<Exam>("SELECT * FROM exams WHERE id = $1", [
     examId,
@@ -190,7 +176,6 @@ export async function regenerateMarkerTokenAction(
   examId: number,
   role: "primary" | "secondary",
 ) {
-  await assertAdmin();
   const column =
     role === "primary" ? "primary_access_token" : "secondary_access_token";
   await query(`UPDATE exams SET ${column} = $1 WHERE id = $2`, [
@@ -205,7 +190,6 @@ export async function setFinalGradeAction(
   submissionId: number,
   formData: FormData,
 ) {
-  await assertAdmin();
   const raw = String(formData.get("final_grade") ?? "").trim();
   if (raw === "") {
     await query(

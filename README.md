@@ -7,27 +7,34 @@ when entering grades.
 
 ## How it works
 
-1. **Admin** creates an exam and uploads a two-column CSV of
-   `seat_number, cid` pairs (or enters seats manually).
-2. **Admin** allocates markers to that exam by email. Each marker is auto-
-   emailed a magic-link sign-in.
-3. **Markers** click the link, see only the exams they were allocated to,
-   and enter grades by seat number. CIDs are never sent to the marker view
-   (the marker SQL query never selects the `cid` column).
-4. **Admin** downloads a Canvas Gradebook CSV (with CIDs revealed and grades
-   filled in) and uploads it straight into Canvas.
+1. **Admin** opens `/admin`, creates an exam (entering primary and secondary
+   marker emails up front), uploads a two-column CSV of `seat_number, cid`
+   pairs, then clicks **Start primary marking**.
+2. The admin exam page displays a **share URL** for each marker
+   (`/m/<examId>/<token>`). The admin sends the primary URL to the first
+   marker by whatever channel they prefer.
+3. The **primary marker** clicks the URL, grades every seat, and clicks
+   **Marking is complete**. The server picks a second-marking sample
+   (boundary grades plus a random fill to ≥10% or ≥10 papers, whichever is
+   larger).
+4. The admin sends the secondary URL to the second marker, who only sees
+   sampled seats (with the primary's grade visible) and grades each.
+5. When the second marker completes, the server computes each seat's
+   **Final Grade**: non-sampled seats inherit the primary grade; sampled
+   seats within 5 points get the average; anything else (≥6 points apart or
+   non-numeric) is flagged for admin resolution.
+6. The admin sets final grades for any flagged rows. The status auto-flips
+   to **Ready for Canvas upload** once every row has a final grade.
+7. The admin downloads a Canvas Gradebook CSV with each student's CID and
+   their final grade, ready to import into Canvas.
 
-## Auth model
+## Auth
 
-- **Magic-link sign-in**: user enters email → we email a single-use,
-  30-minute link → click sets a 30-day signed JWT cookie.
-- **Roles**: `admin` (sees everything, manages exams and marker allocations)
-  and `marker` (sees only allocated exams; CID column is never selected).
-- **Admin bootstrap**: any address in the `ADMIN_EMAILS` env var
-  (comma-separated) is auto-promoted to admin on first sign-in. Defaults to
-  `r.banks@imperial.ac.uk` if the env var is unset.
-- **Marker provisioning**: markers are created when an admin allocates them
-  to an exam — unknown emails cannot self-sign-in.
+There is no login. Admin pages are open at `/admin`; marker pages are
+gated by an unguessable token in the URL. Rely on the obscurity of the
+deployment URL for testing. For production use, put the app behind your
+SSO of choice (e.g. Imperial federated login) before sharing the admin
+URL widely.
 
 ## Stack
 
@@ -35,40 +42,22 @@ when entering grades.
 - Postgres via `pg` (any provider — Neon, Supabase, RDS, local)
 - Tailwind CSS
 
-## Deploy to Vercel (get a public URL in ~2 minutes)
+## Deploy to Vercel
 
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FrbanksIB%2Fcid-seat&project-name=cid-seat&repository-name=cid-seat&stores=%5B%7B%22type%22%3A%22postgres%22%7D%5D)
 
-When you click the button Vercel will:
-1. Authorise the GitHub repo,
-2. Prompt you to provision a Postgres database (Neon free tier is fine — it
-   automatically sets `POSTGRES_URL` for the app),
-3. Build and deploy. The schema is created lazily on first request.
-
-### Required env vars
-
-| Name | Required | Purpose |
-| --- | --- | --- |
-| `POSTGRES_URL` | yes (auto-set by Vercel/Neon) | Database connection string. |
-| `SESSION_SECRET` | yes | ≥32 random chars used to sign session JWTs. `openssl rand -hex 32` works. |
-| `ADMIN_EMAILS` | optional | Comma-separated allowlist of admin email addresses. Default: `r.banks@imperial.ac.uk`. |
-| `RESEND_API_KEY` | optional | Resend API key for sending magic-link emails. If unset, links are printed to server logs (fine for testing, not for real markers). |
-| `MAIL_FROM` | optional | Sender address. Default: `onboarding@resend.dev`. |
-| `APP_URL` | optional | Base URL the app is served from (used in magic-link emails). Default: derived from `VERCEL_URL` or `http://localhost:3000`. |
+The only required env var is `POSTGRES_URL` (auto-set when you add a
+Postgres integration during the deploy wizard).
 
 ## Running locally
 
 ```
 npm install
 export POSTGRES_URL="postgres://user:pass@localhost:5432/cid_seat"
-export SESSION_SECRET="$(openssl rand -hex 32)"
-# RESEND_API_KEY is optional in dev — without it, magic-link URLs are
-# printed to the server logs.
 npm run dev
 ```
 
-Open <http://localhost:3000> and sign in with `r.banks@imperial.ac.uk` (the
-default admin). Copy the magic link from the dev-server logs.
+Open <http://localhost:3000>.
 
 ## Canvas Gradebook CSV
 
@@ -79,5 +68,4 @@ Student, ID, SIS User ID, SIS Login ID, Section, <Assignment column>
 ```
 
 Only `SIS User ID` (the CID) and the assignment column are populated; Canvas
-matches students by SIS User ID. The assignment column header is the exam's
-module code + name, which should match the assignment name in Canvas.
+matches students by SIS User ID.
