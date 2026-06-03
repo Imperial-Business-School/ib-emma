@@ -86,27 +86,29 @@ export async function saveGradesByTokenAction(
     const finalComment = commentTrim === "" ? null : commentTrim;
 
     if (inResolutionPhase) {
-      // Save into final_grade column. Comment field reuses primary_comment.
+      // Resolution phase saves into separate final_* columns so the
+      // marker's original primary grade, comment and timestamp are
+      // preserved for the audit trail.
       if (raw === "") {
         await query(
-          "UPDATE submissions SET final_grade = NULL WHERE id = $1",
-          [id],
+          `UPDATE submissions
+           SET final_grade = NULL,
+               final_comment = $1,
+               final_graded_at = NULL
+           WHERE id = $2`,
+          [finalComment, id],
         );
         results.push({ id, saved_at: null });
       } else {
-        await query(
+        const r = await queryOne<{ final_graded_at: string }>(
           `UPDATE submissions
            SET final_grade = $1,
-               primary_comment = COALESCE($2, primary_comment),
-               graded_at = now()
-           WHERE id = $3`,
+               final_comment = $2,
+               final_graded_at = now()
+           WHERE id = $3 RETURNING final_graded_at`,
           [raw, finalComment, id],
         );
-        const r = await queryOne<{ graded_at: string }>(
-          "SELECT graded_at FROM submissions WHERE id = $1",
-          [id],
-        );
-        results.push({ id, saved_at: r?.graded_at ?? null });
+        results.push({ id, saved_at: r?.final_graded_at ?? null });
       }
     } else if (isPrimary) {
       if (raw === "") {

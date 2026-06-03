@@ -108,6 +108,8 @@ async function initSchema(): Promise<void> {
     ALTER TABLE submissions ADD COLUMN IF NOT EXISTS final_grade TEXT;
     ALTER TABLE submissions ADD COLUMN IF NOT EXISTS primary_comment TEXT;
     ALTER TABLE submissions ADD COLUMN IF NOT EXISTS secondary_comment TEXT;
+    ALTER TABLE submissions ADD COLUMN IF NOT EXISTS final_comment TEXT;
+    ALTER TABLE submissions ADD COLUMN IF NOT EXISTS final_graded_at TIMESTAMPTZ;
   `);
 
   // Backfill access tokens for exams created before the URL-share workflow.
@@ -194,6 +196,8 @@ export type Submission = {
   secondary_comment: string | null;
   in_sample: boolean;
   final_grade: string | null;
+  final_comment: string | null;
+  final_graded_at: string | null;
 };
 
 export { GRADE_REGEX, GRADE_REGEX_SOURCE, isValidGrade } from "./validation";

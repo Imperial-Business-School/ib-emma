@@ -40,8 +40,13 @@ export default async function MarkerByTokenPage({
   // Source rows for the table view.
   const rawRows = isResolving
     ? await query<Submission>(
+        // Show every row that had a discrepancy at second-marking time,
+        // including ones the primary has already resolved -- so the row
+        // doesn't vanish after saving and they can edit if needed.
         `SELECT * FROM submissions
-         WHERE exam_id = $1 AND final_grade IS NULL
+         WHERE exam_id = $1
+           AND in_sample = true
+           AND grade IS DISTINCT FROM secondary_grade
          ORDER BY length(seat_number), seat_number`,
         [examId],
       )
@@ -65,8 +70,8 @@ export default async function MarkerByTokenPage({
           id: r.id,
           seat_number: r.seat_number,
           current_grade: r.final_grade,
-          saved_at: r.graded_at,
-          current_comment: r.primary_comment,
+          saved_at: r.final_graded_at,
+          current_comment: r.final_comment,
           primary_grade: r.grade,
           primary_comment: r.primary_comment,
           secondary_grade: r.secondary_grade,

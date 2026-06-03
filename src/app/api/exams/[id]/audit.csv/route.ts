@@ -72,6 +72,8 @@ export async function GET(
     "Secondary comment",
     "Secondary graded at",
     "Final grade",
+    "Final marker comment",
+    "Final graded at",
   ];
 
   const rows: (string | number | null)[][] = [...meta, header];
@@ -87,6 +89,8 @@ export async function GET(
       s.secondary_comment,
       s.secondary_graded_at,
       s.final_grade,
+      s.final_comment,
+      s.final_graded_at,
     ]);
   }
 
