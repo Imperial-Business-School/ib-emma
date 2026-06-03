@@ -97,6 +97,11 @@ async function initSchema(): Promise<void> {
 
     ALTER TABLE exams ADD COLUMN IF NOT EXISTS sampling_mode TEXT NOT NULL DEFAULT 'standard';
 
+    CREATE INDEX IF NOT EXISTS idx_exams_status ON exams(status);
+    CREATE INDEX IF NOT EXISTS idx_exams_created_at ON exams(created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_exams_name_lower ON exams(lower(name));
+    CREATE INDEX IF NOT EXISTS idx_exams_code_lower ON exams(lower(code));
+
     ALTER TABLE submissions ADD COLUMN IF NOT EXISTS secondary_grade TEXT;
     ALTER TABLE submissions ADD COLUMN IF NOT EXISTS secondary_graded_at TIMESTAMPTZ;
     ALTER TABLE submissions ADD COLUMN IF NOT EXISTS in_sample BOOLEAN NOT NULL DEFAULT false;
@@ -157,15 +162,9 @@ export async function queryOne<T extends QueryResultRow = QueryResultRow>(
   return rows[0];
 }
 
-export type ExamStatus =
-  | "setup"
-  | "primary_marking"
-  | "first_marking_review"
-  | "secondary_marking"
-  | "review"
-  | "complete";
-
-export type SamplingMode = "standard" | "full";
+export type { ExamStatus, SamplingMode } from "./examStatus";
+export { EXAM_STATUS_LABEL } from "./examStatus";
+import type { ExamStatus, SamplingMode } from "./examStatus";
 
 export type Exam = {
   id: number;
@@ -195,15 +194,6 @@ export type Submission = {
   secondary_comment: string | null;
   in_sample: boolean;
   final_grade: string | null;
-};
-
-export const EXAM_STATUS_LABEL: Record<ExamStatus, string> = {
-  setup: "Setup",
-  primary_marking: "Primary marking in progress",
-  first_marking_review: "First marking complete — ready for admin review",
-  secondary_marking: "Secondary marking in progress",
-  review: "Requires Review",
-  complete: "Ready for Canvas upload",
 };
 
 export { GRADE_REGEX, GRADE_REGEX_SOURCE, isValidGrade } from "./validation";

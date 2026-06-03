@@ -1,20 +1,126 @@
 import Link from "next/link";
-import { EXAM_STATUS_LABEL, query, type Exam } from "@/lib/db";
+import {
+  EXAM_STATUS_LABEL,
+  query,
+  queryOne,
+  type Exam,
+  type ExamStatus,
+} from "@/lib/db";
 import { createExamAction } from "./actions";
-import { ExamSearch } from "./ExamSearch";
+import { ExamFilters } from "./ExamFilters";
 
 export const dynamic = "force-dynamic";
 
-type ExamRow = Exam & { total: number; graded: number };
+type ExamRow = Exam & { total: number; graded: number; total_count: number };
 
-export default async function AdminHome() {
+const PAGE_SIZE_DEFAULT = 25;
+
+type SortKey =
+  | "created_desc"
+  | "created_asc"
+  | "name_asc"
+  | "name_desc"
+  | "status_asc";
+
+const SORT_SQL: Record<SortKey, string> = {
+  created_desc: "e.created_at DESC",
+  created_asc: "e.created_at ASC",
+  name_asc: "lower(e.name) ASC",
+  name_desc: "lower(e.name) DESC",
+  status_asc: "e.status ASC, e.created_at DESC",
+};
+
+function parseSort(v: string | undefined): SortKey {
+  if (v && v in SORT_SQL) return v as SortKey;
+  return "created_desc";
+}
+
+function parseStatus(v: string | undefined): ExamStatus | null {
+  if (!v || v === "all") return null;
+  if (v in EXAM_STATUS_LABEL) return v as ExamStatus;
+  return null;
+}
+
+function parseInt1(v: string | undefined, fallback: number): number {
+  const n = Number(v);
+  if (!Number.isFinite(n) || n < 1) return fallback;
+  return Math.floor(n);
+}
+
+export default async function AdminHome({
+  searchParams,
+}: {
+  searchParams: Promise<{
+    q?: string;
+    status?: string;
+    sort?: string;
+    page?: string;
+    pageSize?: string;
+  }>;
+}) {
+  const sp = await searchParams;
+  const q = (sp.q ?? "").trim();
+  const status = parseStatus(sp.status);
+  const sort = parseSort(sp.sort);
+  const pageSize = Math.min(100, parseInt1(sp.pageSize, PAGE_SIZE_DEFAULT));
+  const page = parseInt1(sp.page, 1);
+  const offset = (page - 1) * pageSize;
+
+  // Build the WHERE clause and params for both the count and the list query.
+  const whereParts: string[] = [];
+  const whereParams: unknown[] = [];
+  if (q) {
+    whereParams.push(`%${q.toLowerCase()}%`);
+    whereParts.push(
+      `(lower(e.name) LIKE $${whereParams.length} OR lower(coalesce(e.code, '')) LIKE $${whereParams.length})`,
+    );
+  }
+  if (status) {
+    whereParams.push(status);
+    whereParts.push(`e.status = $${whereParams.length}`);
+  }
+  const whereSql = whereParts.length ? `WHERE ${whereParts.join(" AND ")}` : "";
+
+  const totalRow = await queryOne<{ n: number }>(
+    `SELECT COUNT(*)::int AS n FROM exams e ${whereSql}`,
+    whereParams,
+  );
+  const total = totalRow?.n ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const safeOffset = (safePage - 1) * pageSize;
+
+  const listParams = [...whereParams, pageSize, safeOffset];
   const exams = await query<ExamRow>(
     `SELECT e.*,
             (SELECT COUNT(*) FROM submissions s WHERE s.exam_id = e.id)::int AS total,
             (SELECT COUNT(*) FROM submissions s WHERE s.exam_id = e.id AND s.grade IS NOT NULL)::int AS graded
      FROM exams e
-     ORDER BY e.created_at DESC`,
+     ${whereSql}
+     ORDER BY ${SORT_SQL[sort]}
+     LIMIT $${listParams.length - 1} OFFSET $${listParams.length}`,
+    listParams,
   );
+
+  // Build URLs that preserve filters when changing pages.
+  const buildHref = (overrides: Record<string, string | number | null>) => {
+    const params = new URLSearchParams();
+    if (q) params.set("q", q);
+    if (status) params.set("status", status);
+    if (sort !== "created_desc") params.set("sort", sort);
+    if (pageSize !== PAGE_SIZE_DEFAULT)
+      params.set("pageSize", String(pageSize));
+    if (safePage !== 1) params.set("page", String(safePage));
+    for (const [k, v] of Object.entries(overrides)) {
+      if (v == null || v === "") params.delete(k);
+      else params.set(k, String(v));
+    }
+    const s = params.toString();
+    return s ? `/admin?${s}` : "/admin";
+  };
+
+  const startRow = total === 0 ? 0 : safeOffset + 1;
+  const endRow = Math.min(safeOffset + pageSize, total);
 
   return (
     <div className="space-y-8">
@@ -117,18 +223,166 @@ export default async function AdminHome() {
         </form>
       </section>
 
-      <ExamSearch
-        exams={exams.map((e) => ({
-          id: e.id,
-          name: e.name,
-          code: e.code,
-          status: e.status,
-          status_label: EXAM_STATUS_LABEL[e.status],
-          total: e.total,
-          graded: e.graded,
-          created_at: e.created_at,
-        }))}
+      <ExamFilters
+        initialQ={q}
+        initialStatus={status ?? "all"}
+        initialSort={sort}
+        initialPageSize={pageSize}
       />
+
+      <section className="rounded-lg border bg-white shadow-sm">
+        <div className="flex items-center justify-between border-b px-4 py-2 text-xs text-slate-600">
+          <span>
+            {total === 0
+              ? "No exams match these filters."
+              : `Showing ${startRow}–${endRow} of ${total}`}
+          </span>
+          <span>
+            Page {safePage} of {totalPages}
+          </span>
+        </div>
+        <table className="w-full text-sm">
+          <thead className="border-b bg-slate-50 text-left text-slate-600">
+            <tr>
+              <th className="px-4 py-2">
+                <SortLink
+                  current={sort}
+                  asc="name_asc"
+                  desc="name_desc"
+                  label="Name"
+                  href={(s) => buildHref({ sort: s, page: 1 })}
+                />
+              </th>
+              <th className="px-4 py-2">Code</th>
+              <th className="px-4 py-2">
+                <SortLink
+                  current={sort}
+                  asc="status_asc"
+                  label="Status"
+                  href={(s) => buildHref({ sort: s, page: 1 })}
+                />
+              </th>
+              <th className="px-4 py-2">Progress</th>
+              <th className="px-4 py-2">
+                <SortLink
+                  current={sort}
+                  asc="created_asc"
+                  desc="created_desc"
+                  label="Created"
+                  href={(s) => buildHref({ sort: s, page: 1 })}
+                />
+              </th>
+              <th className="px-4 py-2" />
+            </tr>
+          </thead>
+          <tbody>
+            {exams.length === 0 && (
+              <tr>
+                <td colSpan={6} className="px-4 py-8 text-center text-slate-500">
+                  {total === 0 && (q || status)
+                    ? "No exams match these filters."
+                    : "No exams yet. Create one above."}
+                </td>
+              </tr>
+            )}
+            {exams.map((e) => (
+              <tr key={e.id} className="border-b last:border-b-0">
+                <td className="px-4 py-3 font-medium">{e.name}</td>
+                <td className="px-4 py-3 text-slate-600">{e.code ?? "—"}</td>
+                <td className="px-4 py-3">
+                  <StatusBadge status={e.status} />
+                </td>
+                <td className="px-4 py-3 text-slate-600">
+                  {e.graded} / {e.total} primary
+                </td>
+                <td className="px-4 py-3 text-slate-600">
+                  {new Date(e.created_at).toLocaleDateString()}
+                </td>
+                <td className="px-4 py-3 text-right">
+                  <Link
+                    href={`/admin/exams/${e.id}`}
+                    className="text-blue-600 hover:underline"
+                  >
+                    Manage →
+                  </Link>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <div className="flex items-center justify-between border-t px-4 py-3 text-sm">
+          <Link
+            href={buildHref({ page: safePage - 1 })}
+            aria-disabled={safePage <= 1}
+            className={`rounded border px-3 py-1.5 ${
+              safePage <= 1
+                ? "pointer-events-none border-slate-200 text-slate-300"
+                : "bg-white hover:bg-slate-50"
+            }`}
+          >
+            ← Previous
+          </Link>
+          <span className="text-xs text-slate-600">
+            Page {safePage} of {totalPages}
+          </span>
+          <Link
+            href={buildHref({ page: safePage + 1 })}
+            aria-disabled={safePage >= totalPages}
+            className={`rounded border px-3 py-1.5 ${
+              safePage >= totalPages
+                ? "pointer-events-none border-slate-200 text-slate-300"
+                : "bg-white hover:bg-slate-50"
+            }`}
+          >
+            Next →
+          </Link>
+        </div>
+      </section>
     </div>
+  );
+}
+
+function SortLink({
+  current,
+  asc,
+  desc,
+  label,
+  href,
+}: {
+  current: SortKey;
+  asc: SortKey;
+  desc?: SortKey;
+  label: string;
+  href: (sort: SortKey) => string;
+}) {
+  // Toggle between asc and (if provided) desc when the column is already
+  // active. Otherwise default to asc.
+  const next: SortKey =
+    current === asc && desc ? desc : current === desc ? asc : asc;
+  const arrow =
+    current === asc ? " ↑" : desc && current === desc ? " ↓" : "";
+  return (
+    <Link href={href(next)} className="hover:text-slate-900">
+      {label}
+      <span className="text-slate-400">{arrow}</span>
+    </Link>
+  );
+}
+
+function StatusBadge({ status }: { status: ExamStatus }) {
+  const styles: Record<ExamStatus, string> = {
+    setup: "bg-slate-100 text-slate-700",
+    primary_marking: "bg-blue-100 text-blue-800",
+    first_marking_review: "bg-purple-100 text-purple-800",
+    secondary_marking: "bg-indigo-100 text-indigo-800",
+    review: "bg-amber-100 text-amber-800",
+    complete: "bg-green-100 text-green-800",
+  };
+  return (
+    <span
+      className={`rounded px-2 py-0.5 text-xs font-medium ${styles[status]}`}
+    >
+      {EXAM_STATUS_LABEL[status]}
+    </span>
   );
 }
