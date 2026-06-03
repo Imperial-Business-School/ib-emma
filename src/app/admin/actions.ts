@@ -14,9 +14,15 @@ function parseEmail(input: FormDataEntryValue | null): string {
   return e;
 }
 
+function parseSamplingMode(v: FormDataEntryValue | null): "standard" | "full" {
+  const s = String(v ?? "standard").trim();
+  return s === "full" ? "full" : "standard";
+}
+
 export async function createExamAction(formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
   const code = String(formData.get("code") ?? "").trim() || null;
+  const samplingMode = parseSamplingMode(formData.get("sampling_mode"));
   if (!name) throw new Error("Exam name is required");
 
   const primaryEmail = parseEmail(formData.get("primary_email"));
@@ -36,10 +42,18 @@ export async function createExamAction(formData: FormData) {
   const row = await queryOne<{ id: number }>(
     `INSERT INTO exams
        (name, code, primary_marker_id, secondary_marker_id, status,
-        primary_access_token, secondary_access_token)
-     VALUES ($1, $2, $3, $4, 'setup', $5, $6)
+        sampling_mode, primary_access_token, secondary_access_token)
+     VALUES ($1, $2, $3, $4, 'setup', $5, $6, $7)
      RETURNING id`,
-    [name, code, primary.id, secondary.id, randomToken(), randomToken()],
+    [
+      name,
+      code,
+      primary.id,
+      secondary.id,
+      samplingMode,
+      randomToken(),
+      randomToken(),
+    ],
   );
   if (!row) throw new Error("Failed to create exam");
 
@@ -138,13 +152,22 @@ export async function deleteSeatAction(examId: number, submissionId: number) {
   revalidatePath(`/admin/exams/${examId}`);
 }
 
-export async function deleteExamAction(examId: number) {
+export async function deleteExamAction(examId: number, formData: FormData) {
+  const exam = await queryOne<Exam>("SELECT name FROM exams WHERE id = $1", [
+    examId,
+  ]);
+  if (!exam) return;
+  const typed = String(formData.get("confirm_name") ?? "").trim();
+  if (typed !== exam.name) {
+    throw new Error(
+      `Type the exam name exactly to confirm deletion. Got "${typed}", expected "${exam.name}".`,
+    );
+  }
   await query("DELETE FROM exams WHERE id = $1", [examId]);
   redirect("/admin");
 }
 
 export async function startPrimaryMarkingAction(examId: number) {
-
   const exam = await queryOne<Exam>("SELECT * FROM exams WHERE id = $1", [
     examId,
   ]);
@@ -172,6 +195,54 @@ export async function startPrimaryMarkingAction(examId: number) {
   revalidatePath(`/admin/exams/${examId}`);
 }
 
+export async function toggleInSampleAction(
+  examId: number,
+  submissionId: number,
+) {
+  const exam = await queryOne<Exam>("SELECT status FROM exams WHERE id = $1", [
+    examId,
+  ]);
+  if (!exam) throw new Error("Exam not found");
+  if (exam.status !== "first_marking_review") {
+    throw new Error(
+      "Sample can only be adjusted while awaiting admin review of first marking",
+    );
+  }
+  await query(
+    "UPDATE submissions SET in_sample = NOT in_sample WHERE id = $1 AND exam_id = $2",
+    [submissionId, examId],
+  );
+  revalidatePath(`/admin/exams/${examId}`);
+}
+
+export async function startSecondaryMarkingAction(examId: number) {
+  const exam = await queryOne<Exam>("SELECT * FROM exams WHERE id = $1", [
+    examId,
+  ]);
+  if (!exam) throw new Error("Exam not found");
+  if (exam.status !== "first_marking_review") {
+    throw new Error("Exam is not awaiting admin review");
+  }
+  const sample = await queryOne<{ n: number }>(
+    "SELECT COUNT(*)::int AS n FROM submissions WHERE exam_id = $1 AND in_sample = true",
+    [examId],
+  );
+  if (!sample || sample.n === 0) {
+    throw new Error("Add at least one seat to the second-marking sample");
+  }
+  await query(
+    "UPDATE exams SET status = 'secondary_marking' WHERE id = $1",
+    [examId],
+  );
+
+  // TODO: send email notification to secondary marker (deferred).
+  console.log(
+    `[notify] secondary marker for exam ${examId} should be emailed their URL`,
+  );
+
+  revalidatePath(`/admin/exams/${examId}`);
+}
+
 export async function regenerateMarkerTokenAction(
   examId: number,
   role: "primary" | "secondary",
@@ -182,39 +253,5 @@ export async function regenerateMarkerTokenAction(
     randomToken(),
     examId,
   ]);
-  revalidatePath(`/admin/exams/${examId}`);
-}
-
-export async function setFinalGradeAction(
-  examId: number,
-  submissionId: number,
-  formData: FormData,
-) {
-  const raw = String(formData.get("final_grade") ?? "").trim();
-  if (raw === "") {
-    await query(
-      "UPDATE submissions SET final_grade = NULL WHERE id = $1 AND exam_id = $2",
-      [submissionId, examId],
-    );
-  } else {
-    await query(
-      "UPDATE submissions SET final_grade = $1 WHERE id = $2 AND exam_id = $3",
-      [raw, submissionId, examId],
-    );
-  }
-
-  // If every submission for this exam now has a final grade, flip status to
-  // 'complete'. Otherwise drop back to 'review' if it was previously complete.
-  const remaining = await queryOne<{ n: number }>(
-    "SELECT COUNT(*)::int AS n FROM submissions WHERE exam_id = $1 AND final_grade IS NULL",
-    [examId],
-  );
-  const unresolved = remaining?.n ?? 0;
-  await query(
-    `UPDATE exams SET status = $1
-     WHERE id = $2 AND status IN ('complete','review')`,
-    [unresolved === 0 ? "complete" : "review", examId],
-  );
-
   revalidatePath(`/admin/exams/${examId}`);
 }

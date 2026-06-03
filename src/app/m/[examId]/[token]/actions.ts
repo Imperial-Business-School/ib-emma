@@ -1,9 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { query, queryOne, type Exam } from "@/lib/db";
+import { isValidGrade, query, queryOne, type Exam } from "@/lib/db";
 import { computeFinalGrade } from "@/lib/finalGrade";
-import { computeSampleIds } from "@/lib/sampling";
+import { computeSampleIdsForMode } from "@/lib/sampling";
 
 type MarkerRole = "primary" | "secondary";
 
@@ -27,6 +27,126 @@ function expectedMarkerStatusFor(role: MarkerRole): Exam["status"] {
   return role === "primary" ? "primary_marking" : "secondary_marking";
 }
 
+export async function saveGradesByTokenAction(
+  examId: number,
+  token: string,
+  updates: { id: number; grade: string; comment?: string | null }[],
+): Promise<{ id: number; saved_at: string | null }[]> {
+  const { exam, role } = await authorize(examId, token);
+  const isPrimary = role === "primary";
+
+  // Marker phase write OR primary marker resolving review discrepancies.
+  const inMarkingPhase = exam.status === expectedMarkerStatusFor(role);
+  const inResolutionPhase = isPrimary && exam.status === "review";
+  if (!inMarkingPhase && !inResolutionPhase) {
+    throw new Error("Marking is not currently open for you on this exam");
+  }
+
+  const ids = updates.map((u) => u.id);
+  if (ids.length === 0) return [];
+
+  for (const u of updates) {
+    if (!isValidGrade(u.grade.trim())) {
+      throw new Error(
+        `Grade "${u.grade}" must be a number with at most one decimal place`,
+      );
+    }
+  }
+
+  const rows = await query<{
+    id: number;
+    in_sample: boolean;
+    grade: string | null;
+    secondary_grade: string | null;
+  }>(
+    `SELECT id, in_sample, grade, secondary_grade FROM submissions
+     WHERE exam_id = $1 AND id = ANY($2::int[])`,
+    [examId, ids],
+  );
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  for (const u of updates) {
+    const row = byId.get(u.id);
+    if (!row) throw new Error(`Submission ${u.id} not found for this exam`);
+    if (role === "secondary" && !row.in_sample) {
+      throw new Error("One or more seats are not in the second-marking sample");
+    }
+    if (inResolutionPhase) {
+      // Primary resolution: only allowed on rows that need it (mismatch in
+      // sample). Marking other rows risks rewriting confirmed final grades.
+      if (!row.in_sample || row.grade === row.secondary_grade) {
+        throw new Error("That seat does not need primary-marker review");
+      }
+    }
+  }
+
+  const results: { id: number; saved_at: string | null }[] = [];
+  for (const { id, grade, comment } of updates) {
+    const raw = grade.trim();
+    const commentTrim = comment == null ? null : comment.trim();
+    const finalComment = commentTrim === "" ? null : commentTrim;
+
+    if (inResolutionPhase) {
+      // Save into final_grade column. Comment field reuses primary_comment.
+      if (raw === "") {
+        await query(
+          "UPDATE submissions SET final_grade = NULL WHERE id = $1",
+          [id],
+        );
+        results.push({ id, saved_at: null });
+      } else {
+        await query(
+          `UPDATE submissions
+           SET final_grade = $1,
+               primary_comment = COALESCE($2, primary_comment),
+               graded_at = now()
+           WHERE id = $3`,
+          [raw, finalComment, id],
+        );
+        const r = await queryOne<{ graded_at: string }>(
+          "SELECT graded_at FROM submissions WHERE id = $1",
+          [id],
+        );
+        results.push({ id, saved_at: r?.graded_at ?? null });
+      }
+    } else if (isPrimary) {
+      if (raw === "") {
+        await query(
+          "UPDATE submissions SET grade = NULL, graded_at = NULL, primary_comment = $2 WHERE id = $1",
+          [id, finalComment],
+        );
+        results.push({ id, saved_at: null });
+      } else {
+        const r = await queryOne<{ graded_at: string }>(
+          `UPDATE submissions
+           SET grade = $1, graded_at = now(), primary_comment = $2
+           WHERE id = $3 RETURNING graded_at`,
+          [raw, finalComment, id],
+        );
+        results.push({ id, saved_at: r?.graded_at ?? null });
+      }
+    } else {
+      if (raw === "") {
+        await query(
+          "UPDATE submissions SET secondary_grade = NULL, secondary_graded_at = NULL, secondary_comment = $2 WHERE id = $1",
+          [id, finalComment],
+        );
+        results.push({ id, saved_at: null });
+      } else {
+        const r = await queryOne<{ secondary_graded_at: string }>(
+          `UPDATE submissions
+           SET secondary_grade = $1, secondary_graded_at = now(), secondary_comment = $2
+           WHERE id = $3 RETURNING secondary_graded_at`,
+          [raw, finalComment, id],
+        );
+        results.push({ id, saved_at: r?.secondary_graded_at ?? null });
+      }
+    }
+  }
+
+  revalidatePath(`/m/${examId}/${token}`);
+  return results;
+}
+
 export async function setGradeBySeatByTokenAction(
   examId: number,
   token: string,
@@ -38,7 +158,13 @@ export async function setGradeBySeatByTokenAction(
   }
   const seat = String(formData.get("seat") ?? "").trim();
   const grade = String(formData.get("grade") ?? "").trim();
+  const comment = String(formData.get("comment") ?? "").trim() || null;
   if (!seat) return;
+  if (!isValidGrade(grade)) {
+    throw new Error(
+      "Grade must be a number with at most one decimal place",
+    );
+  }
 
   const row = await queryOne<{ id: number; in_sample: boolean }>(
     "SELECT id, in_sample FROM submissions WHERE exam_id = $1 AND seat_number = $2",
@@ -49,136 +175,15 @@ export async function setGradeBySeatByTokenAction(
     throw new Error(`Seat ${seat} is not in the second-marking sample`);
   }
 
-  await writeGrade(role, row.id, grade);
-  revalidatePath(`/m/${examId}/${token}`);
+  await saveGradesByTokenAction(examId, token, [
+    { id: row.id, grade, comment },
+  ]);
 }
 
-export async function setGradeByTokenAction(
-  examId: number,
-  token: string,
-  submissionId: number,
-  formData: FormData,
-) {
-  const { exam, role } = await authorize(examId, token);
-  if (exam.status !== expectedMarkerStatusFor(role)) {
-    throw new Error("Marking is not currently open for you on this exam");
-  }
-
-  const sub = await queryOne<{ id: number; in_sample: boolean }>(
-    "SELECT id, in_sample FROM submissions WHERE id = $1 AND exam_id = $2",
-    [submissionId, examId],
-  );
-  if (!sub) throw new Error("Submission not found");
-  if (role === "secondary" && !sub.in_sample) {
-    throw new Error("That seat is not in the second-marking sample");
-  }
-
-  const raw = String(formData.get("grade") ?? "").trim();
-  await writeGrade(role, sub.id, raw);
-  revalidatePath(`/m/${examId}/${token}`);
-}
-
-// Bulk save: client component sends every (id, grade) it wants to update in
-// one call. Returns the new DB timestamp per row so the client can show
-// "Saved at HH:MM:SS".
-export async function saveGradesByTokenAction(
-  examId: number,
-  token: string,
-  updates: { id: number; grade: string }[],
-): Promise<{ id: number; saved_at: string | null }[]> {
-  const { exam, role } = await authorize(examId, token);
-  if (exam.status !== expectedMarkerStatusFor(role)) {
-    throw new Error("Marking is not currently open for you on this exam");
-  }
-
-  // Validate that every submitted row belongs to this exam, and that
-  // secondary marker only touches sampled seats.
-  const ids = updates.map((u) => u.id);
-  if (ids.length === 0) return [];
-  const rows = await query<{ id: number; in_sample: boolean }>(
-    `SELECT id, in_sample FROM submissions
-     WHERE exam_id = $1 AND id = ANY($2::int[])`,
-    [examId, ids],
-  );
-  const byId = new Map(rows.map((r) => [r.id, r]));
-  for (const u of updates) {
-    const row = byId.get(u.id);
-    if (!row) throw new Error(`Submission ${u.id} not found for this exam`);
-    if (role === "secondary" && !row.in_sample) {
-      throw new Error("One or more seats are not in the second-marking sample");
-    }
-  }
-
-  const results: { id: number; saved_at: string | null }[] = [];
-  for (const { id, grade } of updates) {
-    const raw = grade.trim();
-    if (role === "primary") {
-      if (raw === "") {
-        await query(
-          "UPDATE submissions SET grade = NULL, graded_at = NULL WHERE id = $1",
-          [id],
-        );
-        results.push({ id, saved_at: null });
-      } else {
-        const r = await queryOne<{ graded_at: string }>(
-          "UPDATE submissions SET grade = $1, graded_at = now() WHERE id = $2 RETURNING graded_at",
-          [raw, id],
-        );
-        results.push({ id, saved_at: r?.graded_at ?? null });
-      }
-    } else {
-      if (raw === "") {
-        await query(
-          "UPDATE submissions SET secondary_grade = NULL, secondary_graded_at = NULL WHERE id = $1",
-          [id],
-        );
-        results.push({ id, saved_at: null });
-      } else {
-        const r = await queryOne<{ secondary_graded_at: string }>(
-          "UPDATE submissions SET secondary_grade = $1, secondary_graded_at = now() WHERE id = $2 RETURNING secondary_graded_at",
-          [raw, id],
-        );
-        results.push({ id, saved_at: r?.secondary_graded_at ?? null });
-      }
-    }
-  }
-
-  revalidatePath(`/m/${examId}/${token}`);
-  return results;
-}
-
-async function writeGrade(
-  role: MarkerRole,
-  submissionId: number,
-  raw: string,
-): Promise<void> {
-  if (role === "primary") {
-    if (raw === "") {
-      await query(
-        "UPDATE submissions SET grade = NULL, graded_at = NULL WHERE id = $1",
-        [submissionId],
-      );
-    } else {
-      await query(
-        "UPDATE submissions SET grade = $1, graded_at = now() WHERE id = $2",
-        [raw, submissionId],
-      );
-    }
-  } else {
-    if (raw === "") {
-      await query(
-        "UPDATE submissions SET secondary_grade = NULL, secondary_graded_at = NULL WHERE id = $1",
-        [submissionId],
-      );
-    } else {
-      await query(
-        "UPDATE submissions SET secondary_grade = $1, secondary_graded_at = now() WHERE id = $2",
-        [raw, submissionId],
-      );
-    }
-  }
-}
-
+// Primary marker finishes first-pass marking.
+// Server picks the initial sample using the exam's sampling_mode, sets status
+// to first_marking_review so the admin can adjust the sample before the
+// second marker is notified.
 export async function completePrimaryMarkingByTokenAction(
   examId: number,
   token: string,
@@ -198,7 +203,7 @@ export async function completePrimaryMarkingByTokenAction(
     throw new Error(`${ungraded} seat(s) still need a grade before completion`);
   }
 
-  const sampleIds = computeSampleIds(subs);
+  const sampleIds = computeSampleIdsForMode(subs, exam.sampling_mode);
   await query("UPDATE submissions SET in_sample = false WHERE exam_id = $1", [
     examId,
   ]);
@@ -211,7 +216,7 @@ export async function completePrimaryMarkingByTokenAction(
 
   await query(
     `UPDATE exams
-     SET status = 'secondary_marking', primary_completed_at = now()
+     SET status = 'first_marking_review', primary_completed_at = now()
      WHERE id = $1`,
     [examId],
   );
@@ -220,6 +225,9 @@ export async function completePrimaryMarkingByTokenAction(
   revalidatePath(`/admin/exams/${examId}`);
 }
 
+// Secondary marker finishes second-pass marking.
+// Computes final grades using exact-match rule. If any sampled row has a
+// mismatch, status moves to 'review' so the primary marker can resolve.
 export async function completeSecondaryMarkingByTokenAction(
   examId: number,
   token: string,
@@ -241,9 +249,6 @@ export async function completeSecondaryMarkingByTokenAction(
     );
   }
 
-  // Compute final grades. Non-sampled seats inherit the primary grade.
-  // Sampled seats with both grades and |diff| <= 5 get the average; larger
-  // discrepancies or non-numeric values are left null for admin to resolve.
   const subs = await query<{
     id: number;
     grade: string | null;
@@ -271,6 +276,31 @@ export async function completeSecondaryMarkingByTokenAction(
     [unresolved > 0 ? "review" : "complete", examId],
   );
 
+  revalidatePath(`/m/${examId}/${token}`);
+  revalidatePath(`/admin/exams/${examId}`);
+}
+
+// Primary marker confirms they've resolved all discrepancies. Flips status
+// back to 'complete' so the Canvas CSV can be downloaded.
+export async function completeFinalMarkingByTokenAction(
+  examId: number,
+  token: string,
+) {
+  const { exam, role } = await authorize(examId, token);
+  if (role !== "primary") throw new Error("Primary marker only");
+  if (exam.status !== "review") {
+    throw new Error("Final marking is not currently in progress");
+  }
+  const remaining = await queryOne<{ n: number }>(
+    "SELECT COUNT(*)::int AS n FROM submissions WHERE exam_id = $1 AND final_grade IS NULL",
+    [examId],
+  );
+  if ((remaining?.n ?? 0) > 0) {
+    throw new Error(
+      `${remaining?.n} seat(s) still need a final grade`,
+    );
+  }
+  await query("UPDATE exams SET status = 'complete' WHERE id = $1", [examId]);
   revalidatePath(`/m/${examId}/${token}`);
   revalidatePath(`/admin/exams/${examId}`);
 }

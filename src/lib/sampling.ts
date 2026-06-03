@@ -17,6 +17,15 @@ export function isBoundaryGrade(grade: string | null): boolean {
 
 export type SamplingInput = { id: number; grade: string | null };
 
+export function computeSampleIdsForMode(
+  submissions: ReadonlyArray<SamplingInput>,
+  mode: "standard" | "full",
+  rng: () => number = Math.random,
+): number[] {
+  if (mode === "full") return submissions.map((s) => s.id);
+  return computeSampleIds(submissions, rng);
+}
+
 export function computeSampleIds(
   submissions: ReadonlyArray<SamplingInput>,
   rng: () => number = Math.random,

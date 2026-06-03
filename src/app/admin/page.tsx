@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { EXAM_STATUS_LABEL, query, type Exam } from "@/lib/db";
 import { createExamAction } from "./actions";
+import { ExamSearch } from "./ExamSearch";
 
 export const dynamic = "force-dynamic";
 
@@ -27,8 +28,8 @@ export default async function AdminHome() {
       <section className="rounded-lg border bg-white p-6 shadow-sm">
         <h2 className="text-lg font-semibold">Create exam</h2>
         <p className="mt-1 text-sm text-slate-600">
-          Enter both markers now. The primary marker will be emailed a sign-in
-          link when you click <em>Start primary marking</em> on the next page.
+          Enter both markers and pick a sampling mode. The sampling mode is
+          locked once primary marking starts.
         </p>
         <form action={createExamAction} className="mt-4 grid gap-3 md:grid-cols-2">
           <input
@@ -42,6 +43,37 @@ export default async function AdminHome() {
             placeholder="Module code (optional)"
             className="rounded border px-3 py-2 md:col-span-2"
           />
+          <fieldset className="rounded border bg-slate-50 p-3 md:col-span-2">
+            <legend className="px-1 text-xs font-semibold uppercase text-slate-500">
+              Second marking
+            </legend>
+            <label className="mt-2 flex items-start gap-2 text-sm">
+              <input
+                type="radio"
+                name="sampling_mode"
+                value="standard"
+                defaultChecked
+                className="mt-1"
+              />
+              <span>
+                <strong>Standard sampling</strong> — at least 10% of papers,
+                including all grade-boundary papers (39–41, 49–51, 59–61, 69–71,
+                79–81).
+              </span>
+            </label>
+            <label className="mt-2 flex items-start gap-2 text-sm">
+              <input
+                type="radio"
+                name="sampling_mode"
+                value="full"
+                className="mt-1"
+              />
+              <span>
+                <strong>Full second marking</strong> — every paper is marked
+                by the second marker.
+              </span>
+            </label>
+          </fieldset>
           <div className="rounded border bg-slate-50 p-3">
             <p className="text-xs font-semibold uppercase text-slate-500">
               Primary marker
@@ -85,65 +117,18 @@ export default async function AdminHome() {
         </form>
       </section>
 
-      <section className="rounded-lg border bg-white shadow-sm">
-        <table className="w-full text-sm">
-          <thead className="border-b bg-slate-50 text-left text-slate-600">
-            <tr>
-              <th className="px-4 py-2">Name</th>
-              <th className="px-4 py-2">Code</th>
-              <th className="px-4 py-2">Status</th>
-              <th className="px-4 py-2">Progress</th>
-              <th className="px-4 py-2" />
-            </tr>
-          </thead>
-          <tbody>
-            {exams.length === 0 && (
-              <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-slate-500">
-                  No exams yet. Create one above.
-                </td>
-              </tr>
-            )}
-            {exams.map((e) => (
-              <tr key={e.id} className="border-b last:border-b-0">
-                <td className="px-4 py-3 font-medium">{e.name}</td>
-                <td className="px-4 py-3 text-slate-600">{e.code ?? "—"}</td>
-                <td className="px-4 py-3">
-                  <StatusBadge status={e.status} />
-                </td>
-                <td className="px-4 py-3 text-slate-600">
-                  {e.graded} / {e.total} primary
-                </td>
-                <td className="px-4 py-3 text-right">
-                  <Link
-                    href={`/admin/exams/${e.id}`}
-                    className="text-blue-600 hover:underline"
-                  >
-                    Manage →
-                  </Link>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </section>
+      <ExamSearch
+        exams={exams.map((e) => ({
+          id: e.id,
+          name: e.name,
+          code: e.code,
+          status: e.status,
+          status_label: EXAM_STATUS_LABEL[e.status],
+          total: e.total,
+          graded: e.graded,
+          created_at: e.created_at,
+        }))}
+      />
     </div>
-  );
-}
-
-function StatusBadge({ status }: { status: Exam["status"] }) {
-  const styles: Record<Exam["status"], string> = {
-    setup: "bg-slate-100 text-slate-700",
-    primary_marking: "bg-blue-100 text-blue-800",
-    secondary_marking: "bg-indigo-100 text-indigo-800",
-    complete: "bg-green-100 text-green-800",
-    review: "bg-amber-100 text-amber-800",
-  };
-  return (
-    <span
-      className={`rounded px-2 py-0.5 text-xs font-medium ${styles[status]}`}
-    >
-      {EXAM_STATUS_LABEL[status]}
-    </span>
   );
 }

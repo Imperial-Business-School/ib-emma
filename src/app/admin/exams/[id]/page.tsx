@@ -11,14 +11,15 @@ import {
 } from "@/lib/db";
 import {
   addSeatAction,
-  deleteExamAction,
   deleteSeatAction,
   reassignMarkerAction,
   regenerateMarkerTokenAction,
-  setFinalGradeAction,
   startPrimaryMarkingAction,
+  startSecondaryMarkingAction,
+  toggleInSampleAction,
   uploadSeatsAction,
 } from "../../actions";
+import { DeleteExamForm } from "./DeleteExamForm";
 
 export const dynamic = "force-dynamic";
 
@@ -73,12 +74,10 @@ export default async function AdminExamPage({
     (s) => s.in_sample && s.secondary_grade !== null,
   ).length;
   const showFinalColumn =
-    exam.status === "complete" || exam.status === "review";
-  const unresolved = submissions.filter(
-    (s) => showFinalColumn && s.final_grade === null,
-  );
+    exam.status === "review" || exam.status === "complete";
   const canStartMarking =
     exam.status === "setup" && totalSeats > 0 && exam.primary_marker_id;
+  const isFirstMarkingReview = exam.status === "first_marking_review";
   const canDownloadCsv = exam.status === "complete";
 
   return (
@@ -90,8 +89,13 @@ export default async function AdminExamPage({
           </Link>
           <h1 className="mt-1 text-2xl font-bold">{exam.name}</h1>
           {exam.code && <p className="text-sm text-slate-600">{exam.code}</p>}
-          <p className="mt-2">
+          <p className="mt-2 flex items-center gap-2">
             <StatusBadge status={exam.status} />
+            <span className="text-xs text-slate-500">
+              {exam.sampling_mode === "full"
+                ? "Full second marking"
+                : "Standard sampling (10% + boundaries)"}
+            </span>
           </p>
         </div>
         <div className="flex flex-col items-end gap-2">
@@ -105,36 +109,56 @@ export default async function AdminExamPage({
           ) : (
             <span
               className="rounded border bg-slate-50 px-3 py-2 text-sm text-slate-400"
-              title="Available once both markers complete"
+              title="Available once every seat has a final grade"
             >
               Download Canvas CSV
             </span>
           )}
+          <a
+            href={`/api/exams/${exam.id}/audit.csv`}
+            className="rounded border bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50"
+          >
+            Download audit CSV
+          </a>
+        </div>
+      </div>
+
+      {isFirstMarkingReview && (
+        <div className="rounded-lg border border-purple-300 bg-purple-50 p-4">
+          <h3 className="font-semibold text-purple-900">
+            Review the second-marking sample
+          </h3>
+          <p className="mt-1 text-sm text-purple-800">
+            {sampleCount} of {totalSeats} seats are currently selected for
+            second marking. Click the star on any row below to add or remove a
+            seat. When you&apos;re happy, click <em>Start second marking</em>.
+          </p>
           <form
             action={async () => {
               "use server";
-              await deleteExamAction(exam.id);
+              await startSecondaryMarkingAction(exam.id);
             }}
+            className="mt-3"
           >
             <button
               type="submit"
-              className="rounded border border-red-200 bg-white px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50"
+              disabled={sampleCount === 0}
+              className="rounded bg-purple-700 px-3 py-2 text-sm font-medium text-white hover:bg-purple-800 disabled:cursor-not-allowed disabled:bg-slate-300"
             >
-              Delete exam
+              Start second marking → notify second marker
             </button>
           </form>
         </div>
-      </div>
+      )}
 
       {exam.status === "review" && (
         <div className="rounded-lg border border-amber-300 bg-amber-50 p-4">
           <h3 className="font-semibold text-amber-900">
-            {unresolved.length} discrepanc{unresolved.length === 1 ? "y" : "ies"} of 6 points
-            or more
+            Awaiting primary marker review of discrepancies
           </h3>
           <p className="mt-1 text-sm text-amber-800">
-            Enter a Final Grade for each highlighted row below. Once every
-            seat has a Final Grade, the exam is ready for Canvas upload.
+            The primary marker has been notified to resolve each discrepancy
+            below. When they finish, the exam returns to <em>Ready for Canvas upload</em>.
           </p>
         </div>
       )}
@@ -226,10 +250,11 @@ export default async function AdminExamPage({
                 type="submit"
                 className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
               >
-                Start primary marking → Email primary marker
+                Start primary marking
               </button>
               <p className="mt-2 text-xs text-slate-500">
-                Sends a magic-link sign-in to {primaryMarker?.email}.
+                Sampling mode locks at this point. Send the primary marker URL
+                shown above to {primaryMarker?.email ?? "the primary marker"}.
               </p>
             </form>
           )}
@@ -248,8 +273,10 @@ export default async function AdminExamPage({
             )}
           </h2>
           <p className="text-xs text-slate-500">
-            Markers never see the CID column. ★ marks rows in the second-marking
-            sample.
+            Markers never see the CID column.{" "}
+            {isFirstMarkingReview
+              ? "Click the star to toggle whether a seat is in the second-marking sample."
+              : "★ marks rows in the second-marking sample."}
           </p>
         </div>
         <table className="w-full text-sm">
@@ -258,8 +285,10 @@ export default async function AdminExamPage({
               <th className="px-4 py-2">Seat</th>
               <th className="px-4 py-2">CID</th>
               <th className="px-4 py-2">Primary grade</th>
-              <th className="px-4 py-2">Sample</th>
+              <th className="px-4 py-2">Comment</th>
+              <th className="px-4 py-2 text-center">Sample</th>
               <th className="px-4 py-2">Secondary grade</th>
+              <th className="px-4 py-2">Comment</th>
               {showFinalColumn && <th className="px-4 py-2">Final grade</th>}
               <th className="px-4 py-2" />
             </tr>
@@ -268,7 +297,7 @@ export default async function AdminExamPage({
             {submissions.length === 0 && (
               <tr>
                 <td
-                  colSpan={showFinalColumn ? 7 : 6}
+                  colSpan={showFinalColumn ? 9 : 8}
                   className="px-4 py-8 text-center text-slate-500"
                 >
                   No seats uploaded yet.
@@ -276,12 +305,14 @@ export default async function AdminExamPage({
               </tr>
             )}
             {submissions.map((s) => {
-              const needsAdmin = showFinalColumn && s.final_grade === null;
+              const needsResolution =
+                showFinalColumn && s.in_sample && s.final_grade === null;
               const mismatch =
-                s.in_sample && s.grade !== null && s.secondary_grade !== null
-                  ? s.grade !== s.secondary_grade
-                  : false;
-              const rowClass = needsAdmin
+                s.in_sample &&
+                s.grade !== null &&
+                s.secondary_grade !== null &&
+                s.grade !== s.secondary_grade;
+              const rowClass = needsResolution
                 ? "bg-amber-100"
                 : mismatch
                   ? "bg-amber-50"
@@ -289,15 +320,46 @@ export default async function AdminExamPage({
               return (
                 <tr
                   key={s.id}
-                  className={`border-b last:border-b-0 ${rowClass}`}
+                  className={`border-b last:border-b-0 align-top ${rowClass}`}
                 >
                   <td className="px-4 py-2 font-mono">{s.seat_number}</td>
                   <td className="px-4 py-2 font-mono">{s.cid}</td>
                   <td className="px-4 py-2">
                     {s.grade ?? <span className="text-slate-400">—</span>}
                   </td>
+                  <td className="px-4 py-2 text-slate-700">
+                    {s.primary_comment ?? <span className="text-slate-400">—</span>}
+                  </td>
                   <td className="px-4 py-2 text-center">
-                    {s.in_sample ? <span title="In sample">★</span> : ""}
+                    {isFirstMarkingReview ? (
+                      <form
+                        action={async () => {
+                          "use server";
+                          await toggleInSampleAction(exam.id, s.id);
+                        }}
+                      >
+                        <button
+                          type="submit"
+                          aria-label={
+                            s.in_sample
+                              ? "Remove from sample"
+                              : "Add to sample"
+                          }
+                          className="cursor-pointer text-lg leading-none hover:opacity-70"
+                          title={
+                            s.in_sample
+                              ? "Click to remove from sample"
+                              : "Click to add to sample"
+                          }
+                        >
+                          {s.in_sample ? "★" : "☆"}
+                        </button>
+                      </form>
+                    ) : s.in_sample ? (
+                      <span title="In sample">★</span>
+                    ) : (
+                      <span className="text-slate-300">☆</span>
+                    )}
                   </td>
                   <td className="px-4 py-2">
                     {s.in_sample ? (
@@ -308,29 +370,21 @@ export default async function AdminExamPage({
                       <span className="text-slate-300">n/a</span>
                     )}
                   </td>
+                  <td className="px-4 py-2 text-slate-700">
+                    {s.in_sample ? (
+                      (s.secondary_comment ?? (
+                        <span className="text-slate-400">—</span>
+                      ))
+                    ) : (
+                      <span className="text-slate-300">n/a</span>
+                    )}
+                  </td>
                   {showFinalColumn && (
                     <td className="px-4 py-2">
-                      {needsAdmin ? (
-                        <form
-                          action={async (fd) => {
-                            "use server";
-                            await setFinalGradeAction(exam.id, s.id, fd);
-                          }}
-                          className="flex gap-2"
-                        >
-                          <input
-                            name="final_grade"
-                            required
-                            placeholder="enter"
-                            className="w-24 rounded border border-amber-400 px-2 py-1 text-sm"
-                          />
-                          <button
-                            type="submit"
-                            className="rounded border bg-white px-2 py-1 text-xs hover:bg-slate-50"
-                          >
-                            Save
-                          </button>
-                        </form>
+                      {needsResolution ? (
+                        <span className="text-xs text-amber-900">
+                          awaiting primary
+                        </span>
                       ) : (
                         <span className="font-medium">
                           {s.final_grade ?? (
@@ -363,6 +417,17 @@ export default async function AdminExamPage({
           </tbody>
         </table>
       </section>
+
+      <section className="border-t pt-6">
+        <details className="text-sm">
+          <summary className="cursor-pointer text-slate-500 hover:text-slate-900">
+            Danger zone
+          </summary>
+          <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-4">
+            <DeleteExamForm examId={exam.id} examName={exam.name} />
+          </div>
+        </details>
+      </section>
     </div>
   );
 }
@@ -384,7 +449,8 @@ function MarkerCard({
 }) {
   const heading = role === "primary" ? "Primary marker" : "Second marker";
   const activeNow =
-    (role === "primary" && status === "primary_marking") ||
+    (role === "primary" &&
+      (status === "primary_marking" || status === "review")) ||
     (role === "secondary" && status === "secondary_marking");
   const hint =
     role === "primary"
@@ -392,9 +458,13 @@ function MarkerCard({
         ? "Send once you click Start primary marking."
         : status === "primary_marking"
           ? "Send this URL to the primary marker."
-          : "Primary marking is finished."
-      : status === "setup" || status === "primary_marking"
-        ? "Send once the primary marker has finished."
+          : status === "review"
+            ? "Send this URL to the primary marker to resolve discrepancies."
+            : "Primary marking is finished."
+      : status === "setup" ||
+          status === "primary_marking" ||
+          status === "first_marking_review"
+        ? "Send once you click Start second marking."
         : status === "secondary_marking"
           ? "Send this URL to the second marker."
           : "Second marking is finished.";
@@ -497,9 +567,10 @@ function StatusBadge({ status }: { status: Exam["status"] }) {
   const styles: Record<Exam["status"], string> = {
     setup: "bg-slate-100 text-slate-700",
     primary_marking: "bg-blue-100 text-blue-800",
+    first_marking_review: "bg-purple-100 text-purple-800",
     secondary_marking: "bg-indigo-100 text-indigo-800",
-    complete: "bg-green-100 text-green-800",
     review: "bg-amber-100 text-amber-800",
+    complete: "bg-green-100 text-green-800",
   };
   return (
     <span

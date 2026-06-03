@@ -95,10 +95,14 @@ async function initSchema(): Promise<void> {
     ALTER TABLE exams ADD COLUMN IF NOT EXISTS primary_access_token TEXT;
     ALTER TABLE exams ADD COLUMN IF NOT EXISTS secondary_access_token TEXT;
 
+    ALTER TABLE exams ADD COLUMN IF NOT EXISTS sampling_mode TEXT NOT NULL DEFAULT 'standard';
+
     ALTER TABLE submissions ADD COLUMN IF NOT EXISTS secondary_grade TEXT;
     ALTER TABLE submissions ADD COLUMN IF NOT EXISTS secondary_graded_at TIMESTAMPTZ;
     ALTER TABLE submissions ADD COLUMN IF NOT EXISTS in_sample BOOLEAN NOT NULL DEFAULT false;
     ALTER TABLE submissions ADD COLUMN IF NOT EXISTS final_grade TEXT;
+    ALTER TABLE submissions ADD COLUMN IF NOT EXISTS primary_comment TEXT;
+    ALTER TABLE submissions ADD COLUMN IF NOT EXISTS secondary_comment TEXT;
   `);
 
   // Backfill access tokens for exams created before the URL-share workflow.
@@ -156,9 +160,12 @@ export async function queryOne<T extends QueryResultRow = QueryResultRow>(
 export type ExamStatus =
   | "setup"
   | "primary_marking"
+  | "first_marking_review"
   | "secondary_marking"
-  | "complete"
-  | "review";
+  | "review"
+  | "complete";
+
+export type SamplingMode = "standard" | "full";
 
 export type Exam = {
   id: number;
@@ -166,6 +173,7 @@ export type Exam = {
   code: string | null;
   created_at: string;
   status: ExamStatus;
+  sampling_mode: SamplingMode;
   primary_marker_id: number | null;
   secondary_marker_id: number | null;
   primary_completed_at: string | null;
@@ -181,8 +189,10 @@ export type Submission = {
   cid: string;
   grade: string | null;
   graded_at: string | null;
+  primary_comment: string | null;
   secondary_grade: string | null;
   secondary_graded_at: string | null;
+  secondary_comment: string | null;
   in_sample: boolean;
   final_grade: string | null;
 };
@@ -190,10 +200,13 @@ export type Submission = {
 export const EXAM_STATUS_LABEL: Record<ExamStatus, string> = {
   setup: "Setup",
   primary_marking: "Primary marking in progress",
+  first_marking_review: "First marking complete — ready for admin review",
   secondary_marking: "Secondary marking in progress",
-  complete: "Ready for Canvas upload",
   review: "Requires Review",
+  complete: "Ready for Canvas upload",
 };
+
+export { GRADE_REGEX, GRADE_REGEX_SOURCE, isValidGrade } from "./validation";
 
 export type Role = "admin" | "marker";
 

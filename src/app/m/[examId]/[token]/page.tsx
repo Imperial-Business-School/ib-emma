@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { query, queryOne, type Exam, type Submission } from "@/lib/db";
 import {
+  completeFinalMarkingByTokenAction,
   completePrimaryMarkingByTokenAction,
   completeSecondaryMarkingByTokenAction,
   setGradeBySeatByTokenAction,
@@ -33,56 +34,64 @@ export default async function MarkerByTokenPage({
   const isPrimary = role === "primary";
   const isSecondary = role === "secondary";
 
-  const rawRows = isSecondary
-    ? await query<
-        Pick<
-          Submission,
-          | "id"
-          | "seat_number"
-          | "grade"
-          | "secondary_grade"
-          | "secondary_graded_at"
-          | "in_sample"
-        >
-      >(
-        `SELECT id, seat_number, grade, secondary_grade, secondary_graded_at, in_sample
-         FROM submissions
-         WHERE exam_id = $1 AND in_sample = true
+  // Primary marker in 'review' status is resolving discrepancies.
+  const isResolving = isPrimary && exam.status === "review";
+
+  // Source rows for the table view.
+  const rawRows = isResolving
+    ? await query<Submission>(
+        `SELECT * FROM submissions
+         WHERE exam_id = $1 AND final_grade IS NULL
          ORDER BY length(seat_number), seat_number`,
         [examId],
       )
-    : await query<
-        Pick<
-          Submission,
-          "id" | "seat_number" | "grade" | "graded_at" | "in_sample"
-        >
-      >(
-        `SELECT id, seat_number, grade, graded_at, in_sample
-         FROM submissions
-         WHERE exam_id = $1
-         ORDER BY length(seat_number), seat_number`,
-        [examId],
-      );
+    : isSecondary
+      ? await query<Submission>(
+          `SELECT * FROM submissions
+           WHERE exam_id = $1 AND in_sample = true
+           ORDER BY length(seat_number), seat_number`,
+          [examId],
+        )
+      : await query<Submission>(
+          `SELECT * FROM submissions
+           WHERE exam_id = $1
+           ORDER BY length(seat_number), seat_number`,
+          [examId],
+        );
 
   const tableRows: GradeRow[] = rawRows.map((r) =>
-    isSecondary
+    isResolving
       ? {
           id: r.id,
           seat_number: r.seat_number,
-          current_grade: "secondary_grade" in r ? r.secondary_grade : null,
-          saved_at:
-            "secondary_graded_at" in r ? r.secondary_graded_at : null,
+          current_grade: r.final_grade,
+          saved_at: r.graded_at,
+          current_comment: r.primary_comment,
           primary_grade: r.grade,
+          primary_comment: r.primary_comment,
+          secondary_grade: r.secondary_grade,
+          secondary_comment: r.secondary_comment,
         }
-      : {
-          id: r.id,
-          seat_number: r.seat_number,
-          current_grade: r.grade,
-          saved_at: "graded_at" in r ? r.graded_at : null,
-        },
+      : isSecondary
+        ? {
+            id: r.id,
+            seat_number: r.seat_number,
+            current_grade: r.secondary_grade,
+            saved_at: r.secondary_graded_at,
+            current_comment: r.secondary_comment,
+            primary_grade: r.grade,
+          }
+        : {
+            id: r.id,
+            seat_number: r.seat_number,
+            current_grade: r.grade,
+            saved_at: r.graded_at,
+            current_comment: r.primary_comment,
+          },
   );
 
   const markingOpen =
+    isResolving ||
     (isPrimary && exam.status === "primary_marking") ||
     (isSecondary && exam.status === "secondary_marking");
 
@@ -90,17 +99,29 @@ export default async function MarkerByTokenPage({
   const graded = tableRows.filter((r) => r.current_grade != null).length;
   const canComplete = markingOpen && total > 0 && graded === total;
 
+  const headerText = isResolving
+    ? "Discrepancies to review"
+    : isSecondary
+      ? "second marker"
+      : "primary marker";
+
   return (
     <div className="space-y-8">
       <div>
         <h1 className="text-2xl font-bold">{exam.name}</h1>
         {exam.code && <p className="text-sm text-slate-600">{exam.code}</p>}
-        <p className="mt-2 text-sm text-slate-600">
-          You are the{" "}
-          <strong>{isSecondary ? "second" : "primary"} marker</strong>.{" "}
-          {graded} of {total}{" "}
-          {isSecondary ? "sampled seats" : "seats"} graded.
-        </p>
+        {isResolving ? (
+          <p className="mt-2 text-sm text-slate-600">
+            <strong>Final marking.</strong> Review each discrepancy below
+            between your grade and the second marker&apos;s, and submit a
+            final grade. {graded} of {total} resolved.
+          </p>
+        ) : (
+          <p className="mt-2 text-sm text-slate-600">
+            You are the <strong>{headerText}</strong>. {graded} of {total}{" "}
+            {isSecondary ? "sampled seats" : "seats"} graded.
+          </p>
+        )}
       </div>
 
       {!markingOpen && (
@@ -108,25 +129,33 @@ export default async function MarkerByTokenPage({
           {isPrimary && exam.status === "setup" && (
             <>The admin hasn&apos;t started marking yet.</>
           )}
+          {isPrimary && exam.status === "first_marking_review" && (
+            <>You have completed your marking. The admin is reviewing the second-marking sample.</>
+          )}
           {isPrimary && exam.status === "secondary_marking" && (
             <>You have completed your marking. The second marker is now reviewing a sample.</>
           )}
           {isSecondary &&
-            (exam.status === "setup" || exam.status === "primary_marking") && (
-              <>The primary marker is still working. You&apos;ll be able to start second-marking once a sample is ready.</>
+            (exam.status === "setup" ||
+              exam.status === "primary_marking" ||
+              exam.status === "first_marking_review") && (
+              <>The primary marker is still working, or the admin is reviewing the sample. You&apos;ll be notified when it&apos;s your turn.</>
             )}
-          {(exam.status === "complete" || exam.status === "review") && (
+          {exam.status === "review" && isSecondary && (
+            <>Your marking is complete. The primary marker is reviewing discrepancies.</>
+          )}
+          {exam.status === "complete" && (
             <>This exam is closed for marker edits.</>
           )}
         </div>
       )}
 
-      {markingOpen && (
+      {markingOpen && !isResolving && (
         <section className="rounded-lg border bg-white p-6 shadow-sm">
           <h2 className="text-lg font-semibold">Quick entry</h2>
           <p className="mt-1 text-sm text-slate-600">
-            Type a seat number and grade, then press Enter. Useful when working
-            through a stack of papers.
+            Type a seat number and grade, then press Enter. Grades must be a
+            number with at most one decimal place (e.g. 70 or 70.5).
           </p>
           <form
             action={async (fd) => {
@@ -146,7 +175,15 @@ export default async function MarkerByTokenPage({
               name="grade"
               placeholder="Grade"
               required
+              pattern="^\d+(\.\d)?$"
+              inputMode="decimal"
+              title="A number with at most one decimal place, e.g. 70 or 70.5"
               className="w-32 rounded border px-3 py-2 text-sm"
+            />
+            <input
+              name="comment"
+              placeholder="Comment (optional)"
+              className="flex-1 min-w-48 rounded border px-3 py-2 text-sm"
             />
             <button
               type="submit"
@@ -163,12 +200,32 @@ export default async function MarkerByTokenPage({
         token={token}
         rows={tableRows}
         isSecondary={isSecondary}
+        isResolving={isResolving}
         markingOpen={markingOpen}
       />
 
       {markingOpen && (
         <section className="rounded-lg border bg-white p-6 shadow-sm">
-          {isPrimary ? (
+          {isResolving ? (
+            <form
+              action={async () => {
+                "use server";
+                await completeFinalMarkingByTokenAction(examId, token);
+              }}
+            >
+              <button
+                type="submit"
+                disabled={!canComplete}
+                className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+              >
+                Final marking complete
+              </button>
+              <p className="mt-2 text-xs text-slate-500">
+                Marks all discrepancies as resolved and returns the exam to
+                Ready for Canvas upload.
+              </p>
+            </form>
+          ) : isPrimary ? (
             <form
               action={async () => {
                 "use server";
@@ -183,8 +240,8 @@ export default async function MarkerByTokenPage({
                 Marking is complete
               </button>
               <p className="mt-2 text-xs text-slate-500">
-                Locks in your grades and picks the second-marking sample
-                (boundary grades plus a random fill of at least 10% of papers).
+                Locks in your grades and hands over to the admin to review the
+                second-marking sample before the second marker is notified.
               </p>
             </form>
           ) : (
@@ -202,8 +259,8 @@ export default async function MarkerByTokenPage({
                 Marking is complete
               </button>
               <p className="mt-2 text-xs text-slate-500">
-                Locks in your grades. The admin will resolve any discrepancies
-                of 6 points or more before the Canvas CSV can be downloaded.
+                Locks in your grades. The primary marker will be asked to
+                resolve any discrepancies.
               </p>
             </form>
           )}

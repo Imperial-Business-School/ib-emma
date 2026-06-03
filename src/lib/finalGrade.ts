@@ -1,38 +1,24 @@
-export const DISCREPANCY_THRESHOLD = 5;
-
 export type FinalGradeResult = {
   value: string | null;
-  needsAdmin: boolean;
+  needsResolution: boolean;
 };
 
-// Determines the final grade for a submission given the two marker grades and
-// whether it was in the second-marking sample.
-//
-// - Non-sampled seats: final = primary grade (only one marker saw it).
-// - Sampled, both numeric, |primary - secondary| <= 5: final = average.
-// - Sampled, anything else (large discrepancy, non-numeric, missing grade):
-//   final is left null; admin must intervene.
+// Final grade rule (current spec):
+// - Non-sampled seats: final = primary grade.
+// - Sampled seats with exactly matching primary and secondary grades:
+//   final = that grade.
+// - Sampled seats with any mismatch (including non-numeric values):
+//   final is null, marked for primary marker to resolve.
 export function computeFinalGrade(
   primary: string | null,
   secondary: string | null,
   inSample: boolean,
 ): FinalGradeResult {
   if (!inSample) {
-    return { value: primary, needsAdmin: false };
+    return { value: primary, needsResolution: false };
   }
-  const p = primary == null ? NaN : Number(primary);
-  const s = secondary == null ? NaN : Number(secondary);
-  if (!Number.isFinite(p) || !Number.isFinite(s)) {
-    return { value: null, needsAdmin: true };
+  if (primary != null && secondary != null && primary === secondary) {
+    return { value: primary, needsResolution: false };
   }
-  if (Math.abs(p - s) <= DISCREPANCY_THRESHOLD) {
-    const avg = (p + s) / 2;
-    return { value: formatGrade(avg), needsAdmin: false };
-  }
-  return { value: null, needsAdmin: true };
-}
-
-function formatGrade(n: number): string {
-  // Trim trailing zeros: 52.5 -> "52.5", 50 -> "50", 50.15 -> "50.15".
-  return n.toFixed(2).replace(/\.?0+$/, "");
+  return { value: null, needsResolution: true };
 }
