@@ -8,6 +8,7 @@ import {
 } from "@/lib/db";
 import { createExamAction } from "./actions";
 import { ExamFilters } from "./ExamFilters";
+import { formatDate } from "@/lib/datetime";
 
 export const dynamic = "force-dynamic";
 
@@ -296,7 +297,7 @@ export default async function AdminHome({
                   {e.graded} / {e.total} primary
                 </td>
                 <td className="px-4 py-3 text-slate-600">
-                  {new Date(e.created_at).toLocaleDateString()}
+                  {formatDate(e.created_at)}
                 </td>
                 <td className="px-4 py-3 text-right">
                   <Link

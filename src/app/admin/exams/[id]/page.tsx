@@ -20,6 +20,7 @@ import {
   uploadSeatsAction,
 } from "../../actions";
 import { DeleteExamForm } from "./DeleteExamForm";
+import { formatDateTime } from "@/lib/datetime";
 
 export const dynamic = "force-dynamic";
 
@@ -489,7 +490,7 @@ function MarkerCard({
           )}
           {completedAt && (
             <p className="mt-1 text-xs text-green-700">
-              Completed {new Date(completedAt).toLocaleString()}
+              Completed {formatDateTime(completedAt)}
             </p>
           )}
         </>

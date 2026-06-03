@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { GRADE_REGEX_SOURCE, isValidGrade } from "@/lib/validation";
+import { formatDateTime } from "@/lib/datetime";
 import { saveGradesByTokenAction } from "./actions";
 
 export type GradeRow = {
@@ -21,10 +22,7 @@ export type GradeRow = {
 type SaveResult = { id: number; saved_at: string | null };
 
 function fmtTime(iso: string | null): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleString();
+  return formatDateTime(iso);
 }
 
 export function GradeTable({
