@@ -92,17 +92,43 @@ export function workingDaysSinceDeadline(
   return count;
 }
 
-// Stubbed email sender. Wires to the server console for now; full body is
-// reconstructed so we can swap to real SMTP/Resend later without changing
-// callers.
-type StubEmail = {
+// Records an outgoing email. For now we don't actually send (no SMTP yet),
+// but every email is persisted to the email_log table so the admin can
+// review and audit them. Console.log is kept so logs are also visible in
+// Vercel function output during development.
+//
+// When SMTP is wired up, this is the single chokepoint to add the send
+// call and flip delivery_status from 'stub' to 'sent' or 'failed'.
+export type EmailToSend = {
   to: string;
   cc?: string;
   subject: string;
   body: string;
   urgent?: boolean;
+  examId?: number | null;
+  kind?: string | null;
 };
-export function logStubEmail(e: StubEmail): void {
+
+export async function recordEmail(e: EmailToSend): Promise<void> {
+  try {
+    await query(
+      `INSERT INTO email_log
+         (recipient, cc, subject, body, urgent, exam_id, kind, delivery_status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'stub')`,
+      [
+        e.to,
+        e.cc ?? null,
+        e.subject,
+        e.body,
+        !!e.urgent,
+        e.examId ?? null,
+        e.kind ?? null,
+      ],
+    );
+  } catch (err) {
+    console.error("Failed to persist email to email_log", err);
+  }
+
   const lines = [
     "─".repeat(60),
     `[email stub] ${e.urgent ? "URGENT — " : ""}${e.subject}`,
@@ -113,6 +139,9 @@ export function logStubEmail(e: StubEmail): void {
   ];
   console.log(lines.join("\n"));
 }
+
+/** @deprecated Use recordEmail instead. */
+export const logStubEmail = recordEmail;
 
 // Build the textual content of a marker notification email. Used for both
 // the "commence marking" and the "overdue" reminder paths.
@@ -125,7 +154,8 @@ export function buildMarkerEmail(opts: {
   role: "primary" | "secondary";
   deadline: Date | null;
   url: string;
-}): StubEmail {
+  examId?: number;
+}): EmailToSend {
   const examLabel = opts.examCode
     ? `${opts.examCode} — ${opts.examName}`
     : opts.examName;
@@ -139,6 +169,8 @@ export function buildMarkerEmail(opts: {
     return {
       to: opts.markerEmail,
       subject: `Marking ready: ${examLabel}`,
+      kind: `${opts.role}_commence`,
+      examId: opts.examId ?? null,
       body: [
         greeting,
         "",
@@ -166,6 +198,8 @@ export function buildMarkerEmail(opts: {
     cc,
     urgent,
     subject,
+    kind: `${opts.role}_${opts.kind}`,
+    examId: opts.examId ?? null,
     body: [
       greeting,
       "",
@@ -306,7 +340,7 @@ async function handlePhase(args: {
   // Send + record reminder if needed.
   const url = markerUrl(origin, exam.id, token);
   if (!alreadyNotifiedOverdue) {
-    logStubEmail(
+    await recordEmail(
       buildMarkerEmail({
         kind: "overdue",
         markerName: marker.name,
@@ -316,6 +350,7 @@ async function handlePhase(args: {
         role: phase,
         deadline,
         url,
+        examId: exam.id,
       }),
     );
     const col =
@@ -325,7 +360,7 @@ async function handlePhase(args: {
     await query(`UPDATE exams SET ${col} = now() WHERE id = $1`, [exam.id]);
   }
   if (isLate && !alreadyNotifiedLate) {
-    logStubEmail(
+    await recordEmail(
       buildMarkerEmail({
         kind: "late",
         markerName: marker.name,
@@ -335,6 +370,7 @@ async function handlePhase(args: {
         role: phase,
         deadline,
         url,
+        examId: exam.id,
       }),
     );
     const col =

@@ -116,6 +116,22 @@ async function initSchema(): Promise<void> {
     ALTER TABLE submissions ADD COLUMN IF NOT EXISTS secondary_comment TEXT;
     ALTER TABLE submissions ADD COLUMN IF NOT EXISTS final_comment TEXT;
     ALTER TABLE submissions ADD COLUMN IF NOT EXISTS final_graded_at TIMESTAMPTZ;
+
+    CREATE TABLE IF NOT EXISTS email_log (
+      id BIGSERIAL PRIMARY KEY,
+      sent_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      recipient TEXT NOT NULL,
+      cc TEXT,
+      subject TEXT NOT NULL,
+      body TEXT NOT NULL,
+      urgent BOOLEAN NOT NULL DEFAULT false,
+      exam_id INTEGER REFERENCES exams(id) ON DELETE SET NULL,
+      kind TEXT,
+      delivery_status TEXT NOT NULL DEFAULT 'stub'
+    );
+    CREATE INDEX IF NOT EXISTS idx_email_log_sent_at ON email_log(sent_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_email_log_recipient ON email_log(lower(recipient));
+    CREATE INDEX IF NOT EXISTS idx_email_log_exam ON email_log(exam_id);
   `);
 
   // Backfill access tokens for exams created before the URL-share workflow.
@@ -223,4 +239,17 @@ export type User = {
   role: Role;
   created_at: string;
   last_login_at: string | null;
+};
+
+export type EmailLog = {
+  id: number;
+  sent_at: string;
+  recipient: string;
+  cc: string | null;
+  subject: string;
+  body: string;
+  urgent: boolean;
+  exam_id: number | null;
+  kind: string | null;
+  delivery_status: string;
 };

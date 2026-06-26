@@ -9,8 +9,8 @@ import { parseCsv } from "@/lib/csv";
 import { parseUkLocalDateTime } from "@/lib/datetime";
 import {
   buildMarkerEmail,
-  logStubEmail,
   markerUrl,
+  recordEmail,
 } from "@/lib/deadlines";
 
 async function getOrigin(): Promise<string> {
@@ -239,7 +239,7 @@ export async function startPrimaryMarkingAction(examId: number) {
   );
   if (marker) {
     const origin = await getOrigin();
-    logStubEmail(
+    await recordEmail(
       buildMarkerEmail({
         kind: "commence",
         markerName: marker.name,
@@ -249,6 +249,7 @@ export async function startPrimaryMarkingAction(examId: number) {
         role: "primary",
         deadline: exam.primary_deadline ? new Date(exam.primary_deadline) : null,
         url: markerUrl(origin, exam.id, exam.primary_access_token),
+        examId: exam.id,
       }),
     );
   }
@@ -320,7 +321,7 @@ export async function startSecondaryMarkingAction(
     );
     if (marker) {
       const origin = await getOrigin();
-      logStubEmail(
+      await recordEmail(
         buildMarkerEmail({
           kind: "commence",
           markerName: marker.name,
@@ -330,6 +331,7 @@ export async function startSecondaryMarkingAction(
           role: "secondary",
           deadline: secondaryDeadline,
           url: markerUrl(origin, exam.id, exam.secondary_access_token),
+          examId: exam.id,
         }),
       );
     }
