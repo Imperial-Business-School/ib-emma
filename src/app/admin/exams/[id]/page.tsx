@@ -9,6 +9,8 @@ import {
   type Submission,
   type User,
 } from "@/lib/db";
+import { STATUS_BADGE_CLASS } from "@/lib/examStatus";
+import { sweepDeadlineStatuses } from "@/lib/deadlines";
 import {
   addSeatAction,
   deleteSeatAction,
@@ -17,10 +19,19 @@ import {
   startPrimaryMarkingAction,
   startSecondaryMarkingAction,
   toggleInSampleAction,
+  updatePrimaryDeadlineAction,
   uploadSeatsAction,
 } from "../../actions";
 import { DeleteExamForm } from "./DeleteExamForm";
 import { formatDateTime } from "@/lib/datetime";
+
+function toDatetimeLocalValue(iso: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
 
 export const dynamic = "force-dynamic";
 
@@ -40,12 +51,13 @@ export default async function AdminExamPage({
   const examId = Number(id);
   if (!Number.isFinite(examId)) notFound();
 
+  const origin = await getOrigin();
+  await sweepDeadlineStatuses({ origin, examId });
+
   const exam = await queryOne<Exam>("SELECT * FROM exams WHERE id = $1", [
     examId,
   ]);
   if (!exam) notFound();
-
-  const origin = await getOrigin();
   const primaryUrl = exam.primary_access_token
     ? `${origin}/m/${exam.id}/${exam.primary_access_token}`
     : null;
@@ -135,12 +147,23 @@ export default async function AdminExamPage({
             seat. When you&apos;re happy, click <em>Start second marking</em>.
           </p>
           <form
-            action={async () => {
+            action={async (fd) => {
               "use server";
-              await startSecondaryMarkingAction(exam.id);
+              await startSecondaryMarkingAction(exam.id, fd);
             }}
-            className="mt-3"
+            className="mt-3 flex flex-wrap items-end gap-3"
           >
+            <label className="text-sm">
+              <span className="block text-xs font-medium text-purple-900">
+                Second marker deadline
+              </span>
+              <input
+                type="datetime-local"
+                name="secondary_deadline"
+                required
+                className="mt-1 rounded border px-2 py-1 text-sm"
+              />
+            </label>
             <button
               type="submit"
               disabled={sampleCount === 0}
@@ -181,6 +204,62 @@ export default async function AdminExamPage({
           shareUrl={secondaryUrl}
           status={exam.status}
         />
+      </section>
+
+      <section className="grid gap-4 md:grid-cols-2">
+        <div className="rounded-lg border bg-white p-4 shadow-sm">
+          <p className="text-xs font-semibold uppercase text-slate-500">
+            Primary marker deadline
+          </p>
+          {exam.status === "setup" ? (
+            <form
+              action={async (fd) => {
+                "use server";
+                await updatePrimaryDeadlineAction(exam.id, fd);
+              }}
+              className="mt-2 flex flex-wrap items-end gap-2"
+            >
+              <input
+                type="datetime-local"
+                name="primary_deadline"
+                defaultValue={toDatetimeLocalValue(exam.primary_deadline)}
+                className="rounded border px-2 py-1 text-sm"
+              />
+              <button
+                type="submit"
+                className="rounded border bg-white px-2 py-1 text-xs hover:bg-slate-50"
+              >
+                Save
+              </button>
+              <p className="basis-full text-xs text-slate-500">
+                Optional. Once set, the marker sees it on their screen and
+                overdue/late reminders fire automatically.
+              </p>
+            </form>
+          ) : exam.primary_deadline ? (
+            <p className="mt-1 font-medium">
+              {formatDateTime(exam.primary_deadline)}
+            </p>
+          ) : (
+            <p className="mt-1 text-sm text-slate-400">Not set</p>
+          )}
+        </div>
+        <div className="rounded-lg border bg-white p-4 shadow-sm">
+          <p className="text-xs font-semibold uppercase text-slate-500">
+            Second marker deadline
+          </p>
+          {exam.secondary_deadline ? (
+            <p className="mt-1 font-medium">
+              {formatDateTime(exam.secondary_deadline)}
+            </p>
+          ) : (
+            <p className="mt-1 text-sm text-slate-400">
+              {exam.status === "first_marking_review"
+                ? "Set when you click Start second marking"
+                : "Not set"}
+            </p>
+          )}
+        </div>
       </section>
 
       {exam.status === "setup" && (
@@ -565,17 +644,9 @@ function MarkerCard({
 }
 
 function StatusBadge({ status }: { status: Exam["status"] }) {
-  const styles: Record<Exam["status"], string> = {
-    setup: "bg-slate-100 text-slate-700",
-    primary_marking: "bg-blue-100 text-blue-800",
-    first_marking_review: "bg-purple-100 text-purple-800",
-    secondary_marking: "bg-indigo-100 text-indigo-800",
-    review: "bg-amber-100 text-amber-800",
-    complete: "bg-green-100 text-green-800",
-  };
   return (
     <span
-      className={`rounded px-2 py-0.5 text-xs font-medium ${styles[status]}`}
+      className={`rounded px-2 py-0.5 text-xs font-medium ${STATUS_BADGE_CLASS[status]}`}
     >
       {EXAM_STATUS_LABEL[status]}
     </span>

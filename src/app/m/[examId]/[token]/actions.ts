@@ -2,6 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { isValidGrade, query, queryOne, type Exam } from "@/lib/db";
+import {
+  isPrimaryMarkingPhase,
+  isSecondaryMarkingPhase,
+} from "@/lib/examStatus";
 import { computeFinalGrade } from "@/lib/finalGrade";
 import { computeSampleIdsForMode } from "@/lib/sampling";
 
@@ -23,8 +27,16 @@ async function authorize(
   throw new Error("Invalid access token");
 }
 
-function expectedMarkerStatusFor(role: MarkerRole): Exam["status"] {
-  return role === "primary" ? "primary_marking" : "secondary_marking";
+// A marker is "in their phase" if the exam is in their active marking
+// status OR an overdue/late variant of it. Overdue/late doesn't block the
+// marker -- they can still save and complete grades.
+function isInMarkerPhase(
+  role: MarkerRole,
+  status: Exam["status"],
+): boolean {
+  return role === "primary"
+    ? isPrimaryMarkingPhase(status)
+    : isSecondaryMarkingPhase(status);
 }
 
 export async function saveGradesByTokenAction(
@@ -36,7 +48,7 @@ export async function saveGradesByTokenAction(
   const isPrimary = role === "primary";
 
   // Marker phase write OR primary marker resolving review discrepancies.
-  const inMarkingPhase = exam.status === expectedMarkerStatusFor(role);
+  const inMarkingPhase = isInMarkerPhase(role, exam.status);
   const inResolutionPhase = isPrimary && exam.status === "review";
   if (!inMarkingPhase && !inResolutionPhase) {
     throw new Error("Marking is not currently open for you on this exam");
@@ -155,7 +167,7 @@ export async function setGradeBySeatByTokenAction(
   formData: FormData,
 ) {
   const { exam, role } = await authorize(examId, token);
-  if (exam.status !== expectedMarkerStatusFor(role)) {
+  if (!isInMarkerPhase(role, exam.status)) {
     throw new Error("Marking is not currently open for you on this exam");
   }
   const seat = String(formData.get("seat") ?? "").trim();
@@ -192,7 +204,7 @@ export async function completePrimaryMarkingByTokenAction(
 ) {
   const { exam, role } = await authorize(examId, token);
   if (role !== "primary") throw new Error("Primary marker only");
-  if (exam.status !== "primary_marking") {
+  if (!isPrimaryMarkingPhase(exam.status)) {
     throw new Error("Primary marking is not currently in progress");
   }
 
@@ -236,7 +248,7 @@ export async function completeSecondaryMarkingByTokenAction(
 ) {
   const { exam, role } = await authorize(examId, token);
   if (role !== "secondary") throw new Error("Secondary marker only");
-  if (exam.status !== "secondary_marking") {
+  if (!isSecondaryMarkingPhase(exam.status)) {
     throw new Error("Secondary marking is not currently in progress");
   }
 

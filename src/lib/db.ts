@@ -96,6 +96,12 @@ async function initSchema(): Promise<void> {
     ALTER TABLE exams ADD COLUMN IF NOT EXISTS secondary_access_token TEXT;
 
     ALTER TABLE exams ADD COLUMN IF NOT EXISTS sampling_mode TEXT NOT NULL DEFAULT 'standard';
+    ALTER TABLE exams ADD COLUMN IF NOT EXISTS primary_deadline TIMESTAMPTZ;
+    ALTER TABLE exams ADD COLUMN IF NOT EXISTS secondary_deadline TIMESTAMPTZ;
+    ALTER TABLE exams ADD COLUMN IF NOT EXISTS primary_overdue_notified_at TIMESTAMPTZ;
+    ALTER TABLE exams ADD COLUMN IF NOT EXISTS primary_late_notified_at TIMESTAMPTZ;
+    ALTER TABLE exams ADD COLUMN IF NOT EXISTS secondary_overdue_notified_at TIMESTAMPTZ;
+    ALTER TABLE exams ADD COLUMN IF NOT EXISTS secondary_late_notified_at TIMESTAMPTZ;
 
     CREATE INDEX IF NOT EXISTS idx_exams_status ON exams(status);
     CREATE INDEX IF NOT EXISTS idx_exams_created_at ON exams(created_at DESC);
@@ -181,6 +187,12 @@ export type Exam = {
   secondary_completed_at: string | null;
   primary_access_token: string | null;
   secondary_access_token: string | null;
+  primary_deadline: string | null;
+  secondary_deadline: string | null;
+  primary_overdue_notified_at: string | null;
+  primary_late_notified_at: string | null;
+  secondary_overdue_notified_at: string | null;
+  secondary_late_notified_at: string | null;
 };
 
 export type Submission = {

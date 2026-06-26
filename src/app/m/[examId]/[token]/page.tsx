@@ -1,5 +1,12 @@
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { query, queryOne, type Exam, type Submission } from "@/lib/db";
+import {
+  isPrimaryMarkingPhase,
+  isSecondaryMarkingPhase,
+} from "@/lib/examStatus";
+import { sweepDeadlineStatuses } from "@/lib/deadlines";
+import { formatDateTime } from "@/lib/datetime";
 import {
   completeFinalMarkingByTokenAction,
   completePrimaryMarkingByTokenAction,
@@ -9,6 +16,13 @@ import {
 import { GradeTable, type GradeRow } from "./GradeTable";
 
 export const dynamic = "force-dynamic";
+
+async function getOrigin(): Promise<string> {
+  const h = await headers();
+  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000";
+  const proto = h.get("x-forwarded-proto") ?? "https";
+  return `${proto}://${host}`;
+}
 
 type MarkerRole = "primary" | "secondary";
 
@@ -20,6 +34,9 @@ export default async function MarkerByTokenPage({
   const { examId: rawId, token } = await params;
   const examId = Number(rawId);
   if (!Number.isFinite(examId)) notFound();
+
+  const origin = await getOrigin();
+  await sweepDeadlineStatuses({ origin, examId });
 
   const exam = await queryOne<Exam>("SELECT * FROM exams WHERE id = $1", [
     examId,
@@ -97,8 +114,22 @@ export default async function MarkerByTokenPage({
 
   const markingOpen =
     isResolving ||
-    (isPrimary && exam.status === "primary_marking") ||
-    (isSecondary && exam.status === "secondary_marking");
+    (isPrimary && isPrimaryMarkingPhase(exam.status)) ||
+    (isSecondary && isSecondaryMarkingPhase(exam.status));
+
+  const myDeadline =
+    isPrimary && exam.primary_deadline
+      ? new Date(exam.primary_deadline)
+      : isSecondary && exam.secondary_deadline
+        ? new Date(exam.secondary_deadline)
+        : null;
+  const showLateBanner =
+    exam.status === "first_marking_late" ||
+    exam.status === "second_marking_late";
+  const showOverdueBanner =
+    !showLateBanner &&
+    (exam.status === "first_marking_overdue" ||
+      exam.status === "second_marking_overdue");
 
   const total = tableRows.length;
   const graded = tableRows.filter((r) => r.current_grade != null).length;
@@ -126,6 +157,29 @@ export default async function MarkerByTokenPage({
             You are the <strong>{headerText}</strong>. {graded} of {total}{" "}
             {isSecondary ? "sampled seats" : "seats"} graded.
           </p>
+        )}
+        {myDeadline && !isResolving && (
+          <div
+            className={`mt-4 rounded-lg border px-4 py-3 text-sm ${
+              showLateBanner
+                ? "border-red-300 bg-red-50 text-red-900"
+                : showOverdueBanner
+                  ? "border-amber-300 bg-amber-50 text-amber-900"
+                  : "border-slate-200 bg-slate-50 text-slate-700"
+            }`}
+          >
+            <span className="font-semibold">
+              {showLateBanner
+                ? "Marking is LATE — please submit immediately."
+                : showOverdueBanner
+                  ? "Marking is OVERDUE — please submit as soon as possible."
+                  : "Deadline"}
+            </span>{" "}
+            <span>
+              Your grades must be submitted by{" "}
+              <strong>{formatDateTime(myDeadline)}</strong> (UK time).
+            </span>
+          </div>
         )}
       </div>
 

@@ -1,10 +1,35 @@
 "use server";
 
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { findOrCreateUser } from "@/lib/auth";
 import { query, queryOne, randomToken, type Exam } from "@/lib/db";
 import { parseCsv } from "@/lib/csv";
+import {
+  buildMarkerEmail,
+  logStubEmail,
+  markerUrl,
+} from "@/lib/deadlines";
+
+async function getOrigin(): Promise<string> {
+  const h = await headers();
+  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000";
+  const proto = h.get("x-forwarded-proto") ?? "https";
+  return `${proto}://${host}`;
+}
+
+function parseDeadline(input: FormDataEntryValue | null): Date | null {
+  const v = String(input ?? "").trim();
+  if (!v) return null;
+  // <input type="datetime-local"> sends "YYYY-MM-DDTHH:MM" without timezone.
+  // Browsers interpret as local; we follow the same convention.
+  const d = new Date(v);
+  if (Number.isNaN(d.getTime())) {
+    throw new Error("Deadline is not a valid date/time");
+  }
+  return d;
+}
 
 function parseEmail(input: FormDataEntryValue | null): string {
   const e = String(input ?? "").trim().toLowerCase();
@@ -23,6 +48,7 @@ export async function createExamAction(formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
   const code = String(formData.get("code") ?? "").trim() || null;
   const samplingMode = parseSamplingMode(formData.get("sampling_mode"));
+  const primaryDeadline = parseDeadline(formData.get("primary_deadline"));
   if (!name) throw new Error("Exam name is required");
 
   const primaryEmail = parseEmail(formData.get("primary_email"));
@@ -42,8 +68,9 @@ export async function createExamAction(formData: FormData) {
   const row = await queryOne<{ id: number }>(
     `INSERT INTO exams
        (name, code, primary_marker_id, secondary_marker_id, status,
-        sampling_mode, primary_access_token, secondary_access_token)
-     VALUES ($1, $2, $3, $4, 'setup', $5, $6, $7)
+        sampling_mode, primary_access_token, secondary_access_token,
+        primary_deadline)
+     VALUES ($1, $2, $3, $4, 'setup', $5, $6, $7, $8)
      RETURNING id`,
     [
       name,
@@ -53,11 +80,24 @@ export async function createExamAction(formData: FormData) {
       samplingMode,
       randomToken(),
       randomToken(),
+      primaryDeadline?.toISOString() ?? null,
     ],
   );
   if (!row) throw new Error("Failed to create exam");
 
   redirect(`/admin/exams/${row.id}`);
+}
+
+export async function updatePrimaryDeadlineAction(
+  examId: number,
+  formData: FormData,
+) {
+  const deadline = parseDeadline(formData.get("primary_deadline"));
+  await query(
+    "UPDATE exams SET primary_deadline = $1 WHERE id = $2 AND status = 'setup'",
+    [deadline?.toISOString() ?? null, examId],
+  );
+  revalidatePath(`/admin/exams/${examId}`);
 }
 
 export async function reassignMarkerAction(
@@ -192,6 +232,27 @@ export async function startPrimaryMarkingAction(examId: number) {
     [examId],
   );
 
+  // Stub email to the primary marker. Will go through real SMTP later.
+  const marker = await queryOne<{ email: string; name: string | null }>(
+    "SELECT email, name FROM users WHERE id = $1",
+    [exam.primary_marker_id],
+  );
+  if (marker) {
+    const origin = await getOrigin();
+    logStubEmail(
+      buildMarkerEmail({
+        kind: "commence",
+        markerName: marker.name,
+        markerEmail: marker.email,
+        examName: exam.name,
+        examCode: exam.code,
+        role: "primary",
+        deadline: exam.primary_deadline ? new Date(exam.primary_deadline) : null,
+        url: markerUrl(origin, exam.id, exam.primary_access_token),
+      }),
+    );
+  }
+
   revalidatePath(`/admin/exams/${examId}`);
 }
 
@@ -215,13 +276,24 @@ export async function toggleInSampleAction(
   revalidatePath(`/admin/exams/${examId}`);
 }
 
-export async function startSecondaryMarkingAction(examId: number) {
+export async function startSecondaryMarkingAction(
+  examId: number,
+  formData: FormData,
+) {
   const exam = await queryOne<Exam>("SELECT * FROM exams WHERE id = $1", [
     examId,
   ]);
   if (!exam) throw new Error("Exam not found");
   if (exam.status !== "first_marking_review") {
     throw new Error("Exam is not awaiting admin review");
+  }
+  const secondaryDeadline = parseDeadline(
+    formData.get("secondary_deadline"),
+  );
+  if (!secondaryDeadline) {
+    throw new Error(
+      "Set a deadline for the second marker before starting second marking",
+    );
   }
   const sample = await queryOne<{ n: number }>(
     "SELECT COUNT(*)::int AS n FROM submissions WHERE exam_id = $1 AND in_sample = true",
@@ -231,14 +303,37 @@ export async function startSecondaryMarkingAction(examId: number) {
     throw new Error("Add at least one seat to the second-marking sample");
   }
   await query(
-    "UPDATE exams SET status = 'secondary_marking' WHERE id = $1",
-    [examId],
+    `UPDATE exams
+     SET status = 'secondary_marking',
+         secondary_deadline = $1,
+         secondary_overdue_notified_at = NULL,
+         secondary_late_notified_at = NULL
+     WHERE id = $2`,
+    [secondaryDeadline.toISOString(), examId],
   );
 
-  // TODO: send email notification to secondary marker (deferred).
-  console.log(
-    `[notify] secondary marker for exam ${examId} should be emailed their URL`,
-  );
+  // Stub email to the second marker.
+  if (exam.secondary_marker_id) {
+    const marker = await queryOne<{ email: string; name: string | null }>(
+      "SELECT email, name FROM users WHERE id = $1",
+      [exam.secondary_marker_id],
+    );
+    if (marker) {
+      const origin = await getOrigin();
+      logStubEmail(
+        buildMarkerEmail({
+          kind: "commence",
+          markerName: marker.name,
+          markerEmail: marker.email,
+          examName: exam.name,
+          examCode: exam.code,
+          role: "secondary",
+          deadline: secondaryDeadline,
+          url: markerUrl(origin, exam.id, exam.secondary_access_token),
+        }),
+      );
+    }
+  }
 
   revalidatePath(`/admin/exams/${examId}`);
 }

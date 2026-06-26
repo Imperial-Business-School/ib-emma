@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { headers } from "next/headers";
 import {
   EXAM_STATUS_LABEL,
   query,
@@ -6,9 +7,18 @@ import {
   type Exam,
   type ExamStatus,
 } from "@/lib/db";
+import { STATUS_BADGE_CLASS } from "@/lib/examStatus";
+import { sweepDeadlineStatuses } from "@/lib/deadlines";
 import { createExamAction } from "./actions";
 import { ExamFilters } from "./ExamFilters";
 import { formatDate } from "@/lib/datetime";
+
+async function getOrigin(): Promise<string> {
+  const h = await headers();
+  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000";
+  const proto = h.get("x-forwarded-proto") ?? "https";
+  return `${proto}://${host}`;
+}
 
 export const dynamic = "force-dynamic";
 
@@ -59,6 +69,7 @@ export default async function AdminHome({
     pageSize?: string;
   }>;
 }) {
+  await sweepDeadlineStatuses({ origin: await getOrigin() });
   const sp = await searchParams;
   const q = (sp.q ?? "").trim();
   const status = parseStatus(sp.status);
@@ -150,6 +161,16 @@ export default async function AdminHome({
             placeholder="Module code (optional)"
             className="rounded border px-3 py-2 md:col-span-2"
           />
+          <label className="text-sm md:col-span-2">
+            <span className="block text-xs font-medium text-slate-600">
+              Primary marker deadline (optional)
+            </span>
+            <input
+              type="datetime-local"
+              name="primary_deadline"
+              className="mt-1 w-full rounded border px-3 py-2 text-sm"
+            />
+          </label>
           <fieldset className="rounded border bg-slate-50 p-3 md:col-span-2">
             <legend className="px-1 text-xs font-semibold uppercase text-slate-500">
               Second marking
@@ -371,17 +392,9 @@ function SortLink({
 }
 
 function StatusBadge({ status }: { status: ExamStatus }) {
-  const styles: Record<ExamStatus, string> = {
-    setup: "bg-slate-100 text-slate-700",
-    primary_marking: "bg-blue-100 text-blue-800",
-    first_marking_review: "bg-purple-100 text-purple-800",
-    secondary_marking: "bg-indigo-100 text-indigo-800",
-    review: "bg-amber-100 text-amber-800",
-    complete: "bg-green-100 text-green-800",
-  };
   return (
     <span
-      className={`rounded px-2 py-0.5 text-xs font-medium ${styles[status]}`}
+      className={`rounded px-2 py-0.5 text-xs font-medium ${STATUS_BADGE_CLASS[status]}`}
     >
       {EXAM_STATUS_LABEL[status]}
     </span>
