@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { findOrCreateUser } from "@/lib/auth";
 import { query, queryOne, randomToken, type Exam } from "@/lib/db";
 import { parseCsv } from "@/lib/csv";
+import { parseUkLocalDateTime } from "@/lib/datetime";
 import {
   buildMarkerEmail,
   logStubEmail,
@@ -22,12 +23,11 @@ async function getOrigin(): Promise<string> {
 function parseDeadline(input: FormDataEntryValue | null): Date | null {
   const v = String(input ?? "").trim();
   if (!v) return null;
-  // <input type="datetime-local"> sends "YYYY-MM-DDTHH:MM" without timezone.
-  // Browsers interpret as local; we follow the same convention.
-  const d = new Date(v);
-  if (Number.isNaN(d.getTime())) {
-    throw new Error("Deadline is not a valid date/time");
-  }
+  // <input type="datetime-local"> sends "YYYY-MM-DDTHH:MM" with no
+  // timezone info. Interpret as Europe/London (the admin is in the UK)
+  // so the stored UTC instant matches what they typed even during BST.
+  const d = parseUkLocalDateTime(v);
+  if (!d) throw new Error("Deadline is not a valid date/time");
   return d;
 }
 
