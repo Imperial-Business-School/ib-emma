@@ -5,8 +5,11 @@ export default function MarkerByTokenLayout({
 }) {
   return (
     <main className="mx-auto max-w-5xl px-6 py-8">
-      <p className="mb-6 text-xs uppercase tracking-wide text-slate-400">
-        IB Anonymous Exam Grading
+      <p
+        className="mb-6 text-xs uppercase tracking-wide text-slate-400"
+        title="Exam Marking & Moderation App"
+      >
+        EMMA — Exam Marking &amp; Moderation
       </p>
       {children}
     </main>

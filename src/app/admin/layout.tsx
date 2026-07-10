@@ -9,8 +9,15 @@ export default function AdminLayout({
     <>
       <header className="border-b bg-white">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <Link href="/admin" className="text-lg font-semibold">
-            IB Anonymous Exam Grading
+          <Link
+            href="/admin"
+            className="flex items-baseline gap-2 text-lg font-semibold"
+            title="Exam Marking & Moderation App"
+          >
+            <span>EMMA</span>
+            <span className="hidden text-xs font-normal text-slate-500 sm:inline">
+              Exam Marking &amp; Moderation App
+            </span>
           </Link>
           <nav className="flex items-center gap-4 text-sm">
             <Link
