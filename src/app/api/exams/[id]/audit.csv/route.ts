@@ -64,6 +64,7 @@ export async function GET(
   const header = [
     "Seat",
     "CID",
+    "Absent",
     "In sample",
     "Primary grade",
     "Primary comment",
@@ -81,6 +82,7 @@ export async function GET(
     rows.push([
       s.seat_number,
       s.cid,
+      s.absent ? "Yes" : "No",
       s.in_sample ? "Yes" : "No",
       s.grade,
       s.primary_comment,

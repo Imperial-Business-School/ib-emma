@@ -8,6 +8,7 @@ import {
 } from "@/lib/examStatus";
 import { computeFinalGrade } from "@/lib/finalGrade";
 import { computeSampleIdsForMode } from "@/lib/sampling";
+import { parseCsv as parseCsvText } from "@/lib/csv";
 
 type MarkerRole = "primary" | "secondary";
 
@@ -70,13 +71,21 @@ export async function saveGradesByTokenAction(
     in_sample: boolean;
     grade: string | null;
     secondary_grade: string | null;
+    absent: boolean;
   }>(
-    `SELECT id, in_sample, grade, secondary_grade FROM submissions
+    `SELECT id, in_sample, grade, secondary_grade, absent FROM submissions
      WHERE exam_id = $1 AND id = ANY($2::int[])`,
     [examId, ids],
   );
   const byId = new Map(rows.map((r) => [r.id, r]));
-  for (const u of updates) {
+  // Silently drop absent-student rows so callers (individual saves and
+  // CSV upload) get consistent behaviour: their grade is ignored, but
+  // everything else in the batch still saves.
+  const filteredUpdates = updates.filter((u) => {
+    const row = byId.get(u.id);
+    return row ? !row.absent : true;
+  });
+  for (const u of filteredUpdates) {
     const row = byId.get(u.id);
     if (!row) throw new Error(`Submission ${u.id} not found for this exam`);
     if (role === "secondary" && !row.in_sample) {
@@ -92,7 +101,7 @@ export async function saveGradesByTokenAction(
   }
 
   const results: { id: number; saved_at: string | null }[] = [];
-  for (const { id, grade, comment } of updates) {
+  for (const { id, grade, comment } of filteredUpdates) {
     const raw = grade.trim();
     const commentTrim = comment == null ? null : comment.trim();
     const finalComment = commentTrim === "" ? null : commentTrim;
@@ -180,11 +189,14 @@ export async function setGradeBySeatByTokenAction(
     );
   }
 
-  const row = await queryOne<{ id: number; in_sample: boolean }>(
-    "SELECT id, in_sample FROM submissions WHERE exam_id = $1 AND seat_number = $2",
+  const row = await queryOne<{ id: number; in_sample: boolean; absent: boolean }>(
+    "SELECT id, in_sample, absent FROM submissions WHERE exam_id = $1 AND seat_number = $2",
     [examId, seat],
   );
   if (!row) throw new Error(`Seat ${seat} not found for this exam`);
+  if (row.absent) {
+    throw new Error(`Seat ${seat} is marked absent; grade ignored`);
+  }
   if (role === "secondary" && !row.in_sample) {
     throw new Error(`Seat ${seat} is not in the second-marking sample`);
   }
@@ -192,6 +204,127 @@ export async function setGradeBySeatByTokenAction(
   await saveGradesByTokenAction(examId, token, [
     { id: row.id, grade, comment },
   ]);
+}
+
+// CSV upload for markers. Expected headers: Seat number, Grade, Comments.
+// Absent seats are silently ignored; other rows continue to save. Returns
+// a summary suitable to render on the marker page.
+export async function uploadGradesCsvByTokenAction(
+  examId: number,
+  token: string,
+  formData: FormData,
+): Promise<{ saved: number; ignoredAbsent: number; skipped: string[] }> {
+  const { exam, role } = await authorize(examId, token);
+  if (!isInMarkerPhase(role, exam.status)) {
+    throw new Error("Marking is not currently open for you on this exam");
+  }
+
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) {
+    throw new Error("No file uploaded");
+  }
+  const text = await file.text();
+  const rows = parseCsvText(text);
+  if (rows.length === 0) throw new Error("CSV is empty");
+
+  const first = rows[0].map((s) => s.trim().toLowerCase());
+  const hasHeader = first.some((c) => /seat|grade|comment/i.test(c));
+  let seatIdx = 0;
+  let gradeIdx = 1;
+  let commentIdx = 2;
+  let start = 0;
+  if (hasHeader) {
+    start = 1;
+    const findIdx = (patterns: RegExp[]) =>
+      first.findIndex((c) => patterns.some((p) => p.test(c)));
+    const s = findIdx([/seat/i]);
+    const g = findIdx([/^grade\b/i, /^mark\b/i]);
+    const c = findIdx([/^comment/i]);
+    if (s >= 0) seatIdx = s;
+    if (g >= 0) gradeIdx = g;
+    if (c >= 0) commentIdx = c;
+  }
+
+  // Pull all seats for this exam once. For secondary role, restrict to
+  // sampled seats. Skip absent seats from the writeable set entirely.
+  const allRows = await query<{
+    id: number;
+    seat_number: string;
+    in_sample: boolean;
+    absent: boolean;
+  }>(
+    "SELECT id, seat_number, in_sample, absent FROM submissions WHERE exam_id = $1",
+    [examId],
+  );
+  const bySeat = new Map(allRows.map((r) => [r.seat_number, r]));
+
+  const updates: { id: number; grade: string; comment: string | null }[] = [];
+  const skipped: string[] = [];
+  let ignoredAbsent = 0;
+
+  for (let i = start; i < rows.length; i++) {
+    const r = rows[i];
+    const seat = (r[seatIdx] ?? "").trim();
+    if (!seat) continue;
+    const gradeCell = (r[gradeIdx] ?? "").trim();
+    const commentCell = (r[commentIdx] ?? "").trim() || null;
+
+    const row = bySeat.get(seat);
+    if (!row) {
+      skipped.push(`Seat ${seat}: not in exam`);
+      continue;
+    }
+    if (row.absent) {
+      ignoredAbsent++;
+      continue;
+    }
+    if (role === "secondary" && !row.in_sample) {
+      skipped.push(`Seat ${seat}: not in second-marking sample`);
+      continue;
+    }
+    if (gradeCell !== "" && !isValidGrade(gradeCell)) {
+      skipped.push(
+        `Seat ${seat}: grade "${gradeCell}" must be a number with at most one decimal place`,
+      );
+      continue;
+    }
+    updates.push({ id: row.id, grade: gradeCell, comment: commentCell });
+  }
+
+  if (updates.length > 0) {
+    await saveGradesByTokenAction(examId, token, updates);
+  }
+  return { saved: updates.length, ignoredAbsent, skipped };
+}
+
+// Clear every grade + comment written by the current marker for this exam.
+// Locked once the marker has clicked their 'Marking Complete' button.
+export async function clearMarksByTokenAction(
+  examId: number,
+  token: string,
+) {
+  const { exam, role } = await authorize(examId, token);
+  if (!isInMarkerPhase(role, exam.status)) {
+    throw new Error("Marking is not open — cannot clear grades now");
+  }
+  if (role === "primary") {
+    await query(
+      `UPDATE submissions
+       SET grade = NULL, graded_at = NULL, primary_comment = NULL
+       WHERE exam_id = $1`,
+      [examId],
+    );
+  } else {
+    await query(
+      `UPDATE submissions
+       SET secondary_grade = NULL,
+           secondary_graded_at = NULL,
+           secondary_comment = NULL
+       WHERE exam_id = $1`,
+      [examId],
+    );
+  }
+  revalidatePath(`/m/${examId}/${token}`);
 }
 
 // Primary marker finishes first-pass marking.
@@ -208,8 +341,9 @@ export async function completePrimaryMarkingByTokenAction(
     throw new Error("Primary marking is not currently in progress");
   }
 
+  // Only non-absent students need grades and are eligible for sampling.
   const subs = await query<{ id: number; grade: string | null }>(
-    "SELECT id, grade FROM submissions WHERE exam_id = $1 ORDER BY id",
+    "SELECT id, grade FROM submissions WHERE exam_id = $1 AND absent = false ORDER BY id",
     [examId],
   );
   const ungraded = subs.filter((s) => s.grade == null).length;
@@ -268,13 +402,23 @@ export async function completeSecondaryMarkingByTokenAction(
     grade: string | null;
     secondary_grade: string | null;
     in_sample: boolean;
+    absent: boolean;
   }>(
-    `SELECT id, grade, secondary_grade, in_sample FROM submissions
+    `SELECT id, grade, secondary_grade, in_sample, absent FROM submissions
      WHERE exam_id = $1`,
     [examId],
   );
   let unresolved = 0;
   for (const s of subs) {
+    if (s.absent) {
+      // Absent students get no final grade -- Canvas import will leave
+      // them blank. Doesn't count as unresolved.
+      await query(
+        "UPDATE submissions SET final_grade = NULL WHERE id = $1",
+        [s.id],
+      );
+      continue;
+    }
     const { value } = computeFinalGrade(s.grade, s.secondary_grade, s.in_sample);
     if (value === null) unresolved++;
     await query("UPDATE submissions SET final_grade = $1 WHERE id = $2", [
@@ -306,7 +450,7 @@ export async function completeFinalMarkingByTokenAction(
     throw new Error("Final marking is not currently in progress");
   }
   const remaining = await queryOne<{ n: number }>(
-    "SELECT COUNT(*)::int AS n FROM submissions WHERE exam_id = $1 AND final_grade IS NULL",
+    "SELECT COUNT(*)::int AS n FROM submissions WHERE exam_id = $1 AND absent = false AND final_grade IS NULL",
     [examId],
   );
   if ((remaining?.n ?? 0) > 0) {

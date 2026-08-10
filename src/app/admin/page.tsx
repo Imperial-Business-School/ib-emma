@@ -70,6 +70,9 @@ export default async function AdminHome({
   }>;
 }) {
   await sweepDeadlineStatuses({ origin: await getOrigin() });
+  const programmes = await query<import("@/lib/db").Programme>(
+    "SELECT * FROM programmes ORDER BY lower(name)",
+  );
   const sp = await searchParams;
   const q = (sp.q ?? "").trim();
   const status = parseStatus(sp.status);
@@ -164,11 +167,38 @@ export default async function AdminHome({
           />
           <label className="text-sm md:col-span-2">
             <span className="block text-xs font-medium text-slate-600">
+              Programme (optional)
+            </span>
+            <select
+              name="programme_id"
+              defaultValue=""
+              className="mt-1 w-full rounded border bg-white px-3 py-2 text-sm"
+            >
+              <option value="">— No programme —</option>
+              {programmes.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name} ({p.programme_id}, {p.level})
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="text-sm">
+            <span className="block text-xs font-medium text-slate-600">
               Primary marker deadline (optional)
             </span>
             <input
               type="datetime-local"
               name="primary_deadline"
+              className="mt-1 w-full rounded border px-3 py-2 text-sm"
+            />
+          </label>
+          <label className="text-sm">
+            <span className="block text-xs font-medium text-slate-600">
+              Second marker deadline (optional)
+            </span>
+            <input
+              type="datetime-local"
+              name="secondary_deadline"
               className="mt-1 w-full rounded border px-3 py-2 text-sm"
             />
           </label>

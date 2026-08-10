@@ -27,7 +27,7 @@ export async function GET(
 
   const submissions = await query<Submission>(
     `SELECT * FROM submissions
-     WHERE exam_id = $1 AND final_grade IS NOT NULL
+     WHERE exam_id = $1 AND absent = false AND final_grade IS NOT NULL
      ORDER BY cid`,
     [examId],
   );

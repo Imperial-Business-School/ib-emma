@@ -27,6 +27,12 @@ export default function AdminLayout({
               Exams
             </Link>
             <Link
+              href="/admin/programmes"
+              className="text-slate-600 hover:text-slate-900"
+            >
+              Programmes
+            </Link>
+            <Link
               href="/admin/emails"
               className="text-slate-600 hover:text-slate-900"
             >

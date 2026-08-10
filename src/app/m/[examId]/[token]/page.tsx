@@ -14,6 +14,7 @@ import {
   setGradeBySeatByTokenAction,
 } from "./actions";
 import { GradeTable, type GradeRow } from "./GradeTable";
+import { MarkerUploadPanel } from "./MarkerUploadPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -69,9 +70,16 @@ export default async function MarkerByTokenPage({
       )
     : isSecondary
       ? await query<Submission>(
-          `SELECT * FROM submissions
-           WHERE exam_id = $1 AND in_sample = true
-           ORDER BY length(seat_number), seat_number`,
+          // In 'full' sampling mode, second marker sees every seat
+          // (including absent students, whose row is unmarkable). In
+          // 'standard' mode they only see the sample.
+          exam.sampling_mode === "full"
+            ? `SELECT * FROM submissions
+               WHERE exam_id = $1
+               ORDER BY length(seat_number), seat_number`
+            : `SELECT * FROM submissions
+               WHERE exam_id = $1 AND in_sample = true
+               ORDER BY length(seat_number), seat_number`,
           [examId],
         )
       : await query<Submission>(
@@ -93,6 +101,7 @@ export default async function MarkerByTokenPage({
           primary_comment: r.primary_comment,
           secondary_grade: r.secondary_grade,
           secondary_comment: r.secondary_comment,
+          absent: r.absent,
         }
       : isSecondary
         ? {
@@ -102,6 +111,7 @@ export default async function MarkerByTokenPage({
             saved_at: r.secondary_graded_at,
             current_comment: r.secondary_comment,
             primary_grade: r.grade,
+            absent: r.absent,
           }
         : {
             id: r.id,
@@ -109,6 +119,7 @@ export default async function MarkerByTokenPage({
             current_grade: r.grade,
             saved_at: r.graded_at,
             current_comment: r.primary_comment,
+            absent: r.absent,
           },
   );
 
@@ -131,8 +142,11 @@ export default async function MarkerByTokenPage({
     (exam.status === "first_marking_overdue" ||
       exam.status === "second_marking_overdue");
 
-  const total = tableRows.length;
-  const graded = tableRows.filter((r) => r.current_grade != null).length;
+  // Absent students can never be graded, so exclude them from the
+  // "graded / total" ratio and the completeness check.
+  const gradableRows = tableRows.filter((r) => !r.absent);
+  const total = gradableRows.length;
+  const graded = gradableRows.filter((r) => r.current_grade != null).length;
   const canComplete = markingOpen && total > 0 && graded === total;
 
   const headerText = isResolving
@@ -252,6 +266,10 @@ export default async function MarkerByTokenPage({
             </button>
           </form>
         </section>
+      )}
+
+      {markingOpen && !isResolving && (
+        <MarkerUploadPanel examId={examId} token={token} />
       )}
 
       <GradeTable

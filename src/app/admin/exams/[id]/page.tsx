@@ -16,12 +16,15 @@ import {
   deleteSeatAction,
   reassignMarkerAction,
   regenerateMarkerTokenAction,
+  resetSeatsAction,
   startPrimaryMarkingAction,
   startSecondaryMarkingAction,
+  toggleAbsentAction,
   toggleInSampleAction,
   updatePrimaryDeadlineAction,
   uploadSeatsAction,
 } from "../../actions";
+import { ResetSeatsForm } from "./ResetSeatsForm";
 import { DeleteExamForm } from "./DeleteExamForm";
 import { formatDateTime, toDatetimeLocalValue } from "@/lib/datetime";
 
@@ -61,6 +64,12 @@ export default async function AdminExamPage({
     "SELECT * FROM submissions WHERE exam_id = $1 ORDER BY length(seat_number), seat_number",
     [examId],
   );
+  const programme = exam.programme_id
+    ? ((await queryOne<import("@/lib/db").Programme>(
+        "SELECT * FROM programmes WHERE id = $1",
+        [exam.programme_id],
+      )) ?? null)
+    : null;
   const primaryMarker = exam.primary_marker_id
     ? ((await queryOne<User>("SELECT * FROM users WHERE id = $1", [
         exam.primary_marker_id,
@@ -94,6 +103,14 @@ export default async function AdminExamPage({
           </Link>
           <h1 className="mt-1 text-2xl font-bold">{exam.name}</h1>
           {exam.code && <p className="text-sm text-slate-600">{exam.code}</p>}
+          {programme && (
+            <p className="text-sm text-slate-600">
+              {programme.name}{" "}
+              <span className="text-slate-400">
+                ({programme.programme_id}, {programme.level})
+              </span>
+            </p>
+          )}
           <p className="mt-2 flex items-center gap-2">
             <StatusBadge status={exam.status} />
             <span className="text-xs text-slate-500">
@@ -258,9 +275,18 @@ export default async function AdminExamPage({
         <section className="rounded-lg border bg-white p-6 shadow-sm">
           <h2 className="text-lg font-semibold">Seats (seat → CID)</h2>
           <p className="mt-1 text-sm text-slate-600">
-            Upload a two-column CSV (<code>seat_number, cid</code>, header row
-            optional) or add a single row.
+            Upload a two-column CSV (headers <code>CID</code> and{" "}
+            <code>Seat number</code>, in either order) or add a single row.
           </p>
+          <div className="mt-2 flex flex-wrap items-center gap-3">
+            <a
+              href={`/api/exams/${exam.id}/seats-template.csv`}
+              className="text-xs text-blue-600 hover:underline"
+            >
+              Download blank template CSV
+            </a>
+            <ResetSeatsForm examId={exam.id} count={totalSeats} />
+          </div>
           <form
             action={async (fd) => {
               "use server";
@@ -356,6 +382,7 @@ export default async function AdminExamPage({
             <tr>
               <th className="px-4 py-2">Seat</th>
               <th className="px-4 py-2">CID</th>
+              <th className="px-4 py-2 text-center">Absent</th>
               <th className="px-4 py-2">Primary grade</th>
               <th className="px-4 py-2">Comment</th>
               <th className="px-4 py-2 text-center">Sample</th>
@@ -369,7 +396,7 @@ export default async function AdminExamPage({
             {submissions.length === 0 && (
               <tr>
                 <td
-                  colSpan={showFinalColumn ? 9 : 8}
+                  colSpan={showFinalColumn ? 10 : 9}
                   className="px-4 py-8 text-center text-slate-500"
                 >
                   No seats uploaded yet.
@@ -396,8 +423,41 @@ export default async function AdminExamPage({
                 >
                   <td className="px-4 py-2 font-mono">{s.seat_number}</td>
                   <td className="px-4 py-2 font-mono">{s.cid}</td>
+                  <td className="px-4 py-2 text-center">
+                    <form
+                      action={async () => {
+                        "use server";
+                        await toggleAbsentAction(exam.id, s.id);
+                      }}
+                    >
+                      <button
+                        type="submit"
+                        aria-label={
+                          s.absent
+                            ? "Mark student as present"
+                            : "Mark student as absent"
+                        }
+                        title={
+                          s.absent
+                            ? "Absent — click to mark present"
+                            : "Present — click to mark absent"
+                        }
+                        className={`rounded px-2 py-0.5 text-xs font-medium ${
+                          s.absent
+                            ? "bg-slate-800 text-white"
+                            : "border bg-white text-slate-500 hover:bg-slate-50"
+                        }`}
+                      >
+                        {s.absent ? "Absent" : "Present"}
+                      </button>
+                    </form>
+                  </td>
                   <td className="px-4 py-2">
-                    {s.grade ?? <span className="text-slate-400">—</span>}
+                    {s.absent ? (
+                      <span className="text-slate-400">—</span>
+                    ) : (
+                      (s.grade ?? <span className="text-slate-400">—</span>)
+                    )}
                   </td>
                   <td className="px-4 py-2 text-slate-700">
                     {s.primary_comment ?? <span className="text-slate-400">—</span>}

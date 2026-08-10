@@ -11,6 +11,7 @@ export type GradeRow = {
   current_grade: string | null;
   saved_at: string | null;
   current_comment: string | null;
+  absent?: boolean;
   // For secondary marker: the primary marker's grade.
   primary_grade?: string | null;
   // For primary marker in resolution view:
@@ -132,7 +133,8 @@ export function GradeTable({
   }
 
   function saveAll() {
-    const dirty = rows
+    const gradable = rows.filter((r) => !r.absent);
+    const dirty = gradable
       .filter(
         (r) =>
           values[r.id] !== (r.current_grade ?? "") ||
@@ -140,7 +142,7 @@ export function GradeTable({
       )
       .map((r) => r.id);
     if (dirty.length === 0) {
-      persist(rows.map((r) => r.id));
+      persist(gradable.map((r) => r.id));
     } else {
       persist(dirty);
     }
@@ -148,8 +150,9 @@ export function GradeTable({
 
   const dirtyCount = rows.filter(
     (r) =>
-      values[r.id] !== (r.current_grade ?? "") ||
-      comments[r.id] !== (r.current_comment ?? ""),
+      !r.absent &&
+      (values[r.id] !== (r.current_grade ?? "") ||
+        comments[r.id] !== (r.current_comment ?? "")),
   ).length;
 
   const showPrimary = isSecondary || isResolving;
@@ -259,7 +262,11 @@ export function GradeTable({
                   </td>
                 )}
                 <td className="px-4 py-2">
-                  {markingOpen ? (
+                  {r.absent ? (
+                    <span className="rounded bg-slate-800 px-2 py-0.5 text-xs font-medium text-white">
+                      Absent
+                    </span>
+                  ) : markingOpen ? (
                     <input
                       value={value}
                       onChange={(e) =>
@@ -276,7 +283,9 @@ export function GradeTable({
                   )}
                 </td>
                 <td className="px-4 py-2">
-                  {markingOpen ? (
+                  {r.absent ? (
+                    <span className="text-slate-400">n/a</span>
+                  ) : markingOpen ? (
                     <input
                       value={comment}
                       onChange={(e) =>
@@ -290,10 +299,12 @@ export function GradeTable({
                   )}
                 </td>
                 <td className="px-4 py-2 text-xs text-slate-600">
-                  {savedAt[r.id]
-                    ? `Saved at ${fmtTime(savedAt[r.id]!)}`
-                    : ""}
-                  {markingOpen && (
+                  {r.absent
+                    ? ""
+                    : savedAt[r.id]
+                      ? `Saved at ${fmtTime(savedAt[r.id]!)}`
+                      : ""}
+                  {markingOpen && !r.absent && (
                     <div className="mt-1">
                       <button
                         type="button"

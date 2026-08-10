@@ -49,6 +49,12 @@ export async function createExamAction(formData: FormData) {
   const code = String(formData.get("code") ?? "").trim() || null;
   const samplingMode = parseSamplingMode(formData.get("sampling_mode"));
   const primaryDeadline = parseDeadline(formData.get("primary_deadline"));
+  const secondaryDeadline = parseDeadline(formData.get("secondary_deadline"));
+  const programmeIdRaw = String(formData.get("programme_id") ?? "").trim();
+  const programmeId = programmeIdRaw ? Number(programmeIdRaw) : null;
+  if (programmeIdRaw && !Number.isFinite(programmeId)) {
+    throw new Error("Programme selection is invalid");
+  }
   if (!name) throw new Error("Exam name is required");
 
   const primaryEmail = parseEmail(formData.get("primary_email"));
@@ -69,8 +75,8 @@ export async function createExamAction(formData: FormData) {
     `INSERT INTO exams
        (name, code, primary_marker_id, secondary_marker_id, status,
         sampling_mode, primary_access_token, secondary_access_token,
-        primary_deadline)
-     VALUES ($1, $2, $3, $4, 'setup', $5, $6, $7, $8)
+        primary_deadline, secondary_deadline, programme_id)
+     VALUES ($1, $2, $3, $4, 'setup', $5, $6, $7, $8, $9, $10)
      RETURNING id`,
     [
       name,
@@ -81,11 +87,57 @@ export async function createExamAction(formData: FormData) {
       randomToken(),
       randomToken(),
       primaryDeadline?.toISOString() ?? null,
+      secondaryDeadline?.toISOString() ?? null,
+      programmeId,
     ],
   );
   if (!row) throw new Error("Failed to create exam");
 
   redirect(`/admin/exams/${row.id}`);
+}
+
+export async function resetSeatsAction(examId: number) {
+  const exam = await queryOne<Exam>(
+    "SELECT status FROM exams WHERE id = $1",
+    [examId],
+  );
+  if (!exam) throw new Error("Exam not found");
+  if (exam.status !== "setup") {
+    throw new Error(
+      "Seat list can only be reset before primary marking begins",
+    );
+  }
+  await query("DELETE FROM submissions WHERE exam_id = $1", [examId]);
+  revalidatePath(`/admin/exams/${examId}`);
+}
+
+export async function toggleAbsentAction(
+  examId: number,
+  submissionId: number,
+) {
+  const exam = await queryOne<Exam>(
+    "SELECT status FROM exams WHERE id = $1",
+    [examId],
+  );
+  if (!exam) throw new Error("Exam not found");
+  await query(
+    `UPDATE submissions
+     SET absent = NOT absent,
+         -- If we're marking absent, wipe any grade / comment that leaked in.
+         grade = CASE WHEN NOT absent THEN NULL ELSE grade END,
+         graded_at = CASE WHEN NOT absent THEN NULL ELSE graded_at END,
+         primary_comment = CASE WHEN NOT absent THEN NULL ELSE primary_comment END,
+         secondary_grade = CASE WHEN NOT absent THEN NULL ELSE secondary_grade END,
+         secondary_graded_at = CASE WHEN NOT absent THEN NULL ELSE secondary_graded_at END,
+         secondary_comment = CASE WHEN NOT absent THEN NULL ELSE secondary_comment END,
+         final_grade = CASE WHEN NOT absent THEN NULL ELSE final_grade END,
+         final_comment = CASE WHEN NOT absent THEN NULL ELSE final_comment END,
+         final_graded_at = CASE WHEN NOT absent THEN NULL ELSE final_graded_at END,
+         in_sample = CASE WHEN NOT absent THEN false ELSE in_sample END
+     WHERE id = $1 AND exam_id = $2`,
+    [submissionId, examId],
+  );
+  revalidatePath(`/admin/exams/${examId}`);
 }
 
 export async function updatePrimaryDeadlineAction(
@@ -141,15 +193,28 @@ export async function uploadSeatsAction(examId: number, formData: FormData) {
   const rows = parseCsv(text);
   if (rows.length === 0) throw new Error("CSV is empty");
 
-  let start = 0;
+  // Header detection: look for known column names and remember their
+  // position. Falls back to positional (seat, cid) if no header row.
   const first = rows[0].map((s) => s.trim().toLowerCase());
-  if (first.some((c) => /seat|cid|student/i.test(c))) start = 1;
+  const hasHeader = first.some((c) => /seat|cid|student/i.test(c));
+  let seatIdx = 0;
+  let cidIdx = 1;
+  let start = 0;
+  if (hasHeader) {
+    start = 1;
+    const findIdx = (patterns: RegExp[]) =>
+      first.findIndex((c) => patterns.some((p) => p.test(c)));
+    const s = findIdx([/^seat/i, /seat.?number/i, /seat.?no/i]);
+    const c = findIdx([/^cid$/i, /^cid\b/i, /student.?id/i]);
+    if (s >= 0) seatIdx = s;
+    if (c >= 0) cidIdx = c;
+  }
 
   const entries: { seat: string; cid: string }[] = [];
   for (let i = start; i < rows.length; i++) {
     const r = rows[i];
-    const seat = (r[0] ?? "").trim();
-    const cid = (r[1] ?? "").trim();
+    const seat = (r[seatIdx] ?? "").trim();
+    const cid = (r[cidIdx] ?? "").trim();
     if (!seat || !cid) continue;
     entries.push({ seat, cid });
   }

@@ -132,6 +132,19 @@ async function initSchema(): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_email_log_sent_at ON email_log(sent_at DESC);
     CREATE INDEX IF NOT EXISTS idx_email_log_recipient ON email_log(lower(recipient));
     CREATE INDEX IF NOT EXISTS idx_email_log_exam ON email_log(exam_id);
+
+    CREATE TABLE IF NOT EXISTS programmes (
+      id SERIAL PRIMARY KEY,
+      name TEXT NOT NULL,
+      programme_id TEXT NOT NULL,
+      level TEXT NOT NULL CHECK (level IN ('MSc','MBA','BSc')),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_programmes_programme_id ON programmes(lower(programme_id));
+
+    ALTER TABLE exams ADD COLUMN IF NOT EXISTS programme_id INTEGER REFERENCES programmes(id) ON DELETE SET NULL;
+
+    ALTER TABLE submissions ADD COLUMN IF NOT EXISTS absent BOOLEAN NOT NULL DEFAULT false;
   `);
 
   // Backfill access tokens for exams created before the URL-share workflow.
@@ -209,6 +222,7 @@ export type Exam = {
   primary_late_notified_at: string | null;
   secondary_overdue_notified_at: string | null;
   secondary_late_notified_at: string | null;
+  programme_id: number | null;
 };
 
 export type Submission = {
@@ -226,7 +240,11 @@ export type Submission = {
   final_grade: string | null;
   final_comment: string | null;
   final_graded_at: string | null;
+  absent: boolean;
 };
+
+export type { ProgrammeLevel, Programme } from "./examStatus";
+export { PROGRAMME_LEVELS } from "./examStatus";
 
 export { GRADE_REGEX, GRADE_REGEX_SOURCE, isValidGrade } from "./validation";
 

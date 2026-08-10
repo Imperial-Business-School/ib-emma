@@ -15,6 +15,17 @@ export type ExamStatus =
 
 export type SamplingMode = "standard" | "full";
 
+export type ProgrammeLevel = "MSc" | "MBA" | "BSc";
+export const PROGRAMME_LEVELS: ProgrammeLevel[] = ["MSc", "MBA", "BSc"];
+
+export type Programme = {
+  id: number;
+  name: string;
+  programme_id: string;
+  level: ProgrammeLevel;
+  created_at: string;
+};
+
 export const EXAM_STATUS_LABEL: Record<ExamStatus, string> = {
   setup: "Setup",
   primary_marking: "Primary marking in progress",
