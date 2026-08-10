@@ -15,8 +15,14 @@ export type ExamStatus =
 
 export type SamplingMode = "standard" | "full";
 
-export type ProgrammeLevel = "MSc" | "MBA" | "BSc";
-export const PROGRAMME_LEVELS: ProgrammeLevel[] = ["MSc", "MBA", "BSc"];
+export type ProgrammeLevel = "MSc" | "MBA" | "MRes" | "PhD" | "BSc";
+export const PROGRAMME_LEVELS: ProgrammeLevel[] = [
+  "MSc",
+  "MBA",
+  "MRes",
+  "PhD",
+  "BSc",
+];
 
 export type Programme = {
   id: number;

@@ -397,7 +397,7 @@ export async function completePrimaryMarkingByTokenAction(
 
   // Load programme level to pick the right fail threshold.
   const programme = exam.programme_id
-    ? await queryOne<{ level: "MSc" | "MBA" | "BSc" }>(
+    ? await queryOne<{ level: "MSc" | "MBA" | "MRes" | "PhD" | "BSc" }>(
         "SELECT level FROM programmes WHERE id = $1",
         [exam.programme_id],
       )

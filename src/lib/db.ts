@@ -158,9 +158,13 @@ async function initSchema(): Promise<void> {
       id SERIAL PRIMARY KEY,
       name TEXT NOT NULL,
       programme_id TEXT NOT NULL,
-      level TEXT NOT NULL CHECK (level IN ('MSc','MBA','BSc')),
+      level TEXT NOT NULL,
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
+
+    -- Drop the legacy CHECK constraint (if it exists, from when the
+    -- allowed set was only MSc/MBA/BSc) so MRes and PhD are accepted.
+    ALTER TABLE programmes DROP CONSTRAINT IF EXISTS programmes_level_check;
     CREATE UNIQUE INDEX IF NOT EXISTS idx_programmes_programme_id ON programmes(lower(programme_id));
 
     ALTER TABLE exams ADD COLUMN IF NOT EXISTS programme_id INTEGER REFERENCES programmes(id) ON DELETE SET NULL;

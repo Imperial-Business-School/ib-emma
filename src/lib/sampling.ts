@@ -24,8 +24,15 @@ const GRADE_BRACKETS: ReadonlyArray<readonly [number, number]> = [
 
 export type SamplingInput = { id: number; grade: string | null };
 
-export type SamplingProgrammeLevel = "MSc" | "MBA" | "BSc";
+export type SamplingProgrammeLevel =
+  | "MSc"
+  | "MBA"
+  | "MRes"
+  | "PhD"
+  | "BSc";
 
+// BSc is the only undergraduate level; everything else is treated as
+// postgraduate.
 export function failThresholdFor(
   level: SamplingProgrammeLevel | null | undefined,
 ): number {
