@@ -26,6 +26,14 @@ export type Programme = {
   created_at: string;
 };
 
+export type Admin = {
+  id: number;
+  email: string;
+  name: string;
+  created_at: string;
+  last_access_at: string | null;
+};
+
 export const EXAM_STATUS_LABEL: Record<ExamStatus, string> = {
   setup: "Setup",
   primary_marking: "Primary marking in progress",

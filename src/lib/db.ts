@@ -143,8 +143,32 @@ async function initSchema(): Promise<void> {
     CREATE UNIQUE INDEX IF NOT EXISTS idx_programmes_programme_id ON programmes(lower(programme_id));
 
     ALTER TABLE exams ADD COLUMN IF NOT EXISTS programme_id INTEGER REFERENCES programmes(id) ON DELETE SET NULL;
+    ALTER TABLE exams ADD COLUMN IF NOT EXISTS module_name TEXT;
+    ALTER TABLE exams ADD COLUMN IF NOT EXISTS academic_year TEXT;
+    ALTER TABLE exams ADD COLUMN IF NOT EXISTS mcq_enabled BOOLEAN NOT NULL DEFAULT false;
+    ALTER TABLE exams ADD COLUMN IF NOT EXISTS mcq_weighting NUMERIC(5,2);
 
     ALTER TABLE submissions ADD COLUMN IF NOT EXISTS absent BOOLEAN NOT NULL DEFAULT false;
+    ALTER TABLE submissions ADD COLUMN IF NOT EXISTS mcq_score TEXT;
+    ALTER TABLE submissions ADD COLUMN IF NOT EXISTS override_note TEXT;
+
+    CREATE TABLE IF NOT EXISTS admins (
+      id SERIAL PRIMARY KEY,
+      email TEXT NOT NULL,
+      name TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      last_access_at TIMESTAMPTZ
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_admins_email ON admins(lower(email));
+
+    -- Seed initial admins on empty database.
+    INSERT INTO admins (email, name)
+    SELECT * FROM (VALUES
+      ('e.stoakes@imperial.ac.uk', 'Emma Stoakes'),
+      ('j.chaffin@imperial.ac.uk', 'Jo Chaffin'),
+      ('r.banks@imperial.ac.uk', 'Richard Banks')
+    ) AS seed(email, name)
+    WHERE NOT EXISTS (SELECT 1 FROM admins);
   `);
 
   // Backfill access tokens for exams created before the URL-share workflow.
@@ -223,6 +247,10 @@ export type Exam = {
   secondary_overdue_notified_at: string | null;
   secondary_late_notified_at: string | null;
   programme_id: number | null;
+  module_name: string | null;
+  academic_year: string | null;
+  mcq_enabled: boolean;
+  mcq_weighting: string | null;
 };
 
 export type Submission = {
@@ -241,7 +269,23 @@ export type Submission = {
   final_comment: string | null;
   final_graded_at: string | null;
   absent: boolean;
+  mcq_score: string | null;
+  override_note: string | null;
 };
+
+export type { Admin } from "./examStatus";
+
+export const ACADEMIC_YEARS = [
+  "23/24",
+  "24/25",
+  "25/26",
+  "26/27",
+  "27/28",
+  "28/29",
+  "29/30",
+] as const;
+
+export const DEFAULT_ACADEMIC_YEAR = "26/27";
 
 export type { ProgrammeLevel, Programme } from "./examStatus";
 export { PROGRAMME_LEVELS } from "./examStatus";

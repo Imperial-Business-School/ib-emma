@@ -8,6 +8,7 @@ import {
   type User,
 } from "@/lib/db";
 import { toCsv } from "@/lib/csv";
+import { computeWeightedGrade } from "@/lib/weighted";
 
 export const dynamic = "force-dynamic";
 
@@ -45,8 +46,12 @@ export async function GET(
   const meta = [
     ["# Exam", exam.name],
     ["# Code", exam.code ?? ""],
+    ["# Module name", exam.module_name ?? ""],
+    ["# Academic year", exam.academic_year ?? ""],
     ["# Status", EXAM_STATUS_LABEL[exam.status]],
     ["# Sampling mode", exam.sampling_mode],
+    ["# MCQ enabled", exam.mcq_enabled ? "Yes" : "No"],
+    ["# MCQ weighting", exam.mcq_weighting ?? ""],
     ["# Created at", exam.created_at],
     ["# Primary completed at", exam.primary_completed_at ?? ""],
     ["# Secondary completed at", exam.secondary_completed_at ?? ""],
@@ -62,8 +67,8 @@ export async function GET(
   ];
 
   const header = [
-    "Seat",
     "CID",
+    "Seat",
     "Absent",
     "In sample",
     "Primary grade",
@@ -75,13 +80,24 @@ export async function GET(
     "Final grade",
     "Final marker comment",
     "Final graded at",
+    "MCQ score",
+    "Weighted grade",
+    "Override note",
   ];
 
   const rows: (string | number | null)[][] = [...meta, header];
   for (const s of submissions) {
+    const weighted = s.absent
+      ? null
+      : computeWeightedGrade(
+          s.final_grade,
+          s.mcq_score,
+          exam.mcq_weighting,
+          exam.mcq_enabled,
+        );
     rows.push([
-      s.seat_number,
       s.cid,
+      s.seat_number,
       s.absent ? "Yes" : "No",
       s.in_sample ? "Yes" : "No",
       s.grade,
@@ -93,6 +109,9 @@ export async function GET(
       s.final_grade,
       s.final_comment,
       s.final_graded_at,
+      s.mcq_score,
+      weighted,
+      s.override_note,
     ]);
   }
 

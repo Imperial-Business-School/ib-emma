@@ -102,6 +102,7 @@ export default async function MarkerByTokenPage({
           secondary_grade: r.secondary_grade,
           secondary_comment: r.secondary_comment,
           absent: r.absent,
+          mcq_score: r.mcq_score,
         }
       : isSecondary
         ? {
@@ -112,6 +113,7 @@ export default async function MarkerByTokenPage({
             current_comment: r.secondary_comment,
             primary_grade: r.grade,
             absent: r.absent,
+            mcq_score: r.mcq_score,
           }
         : {
             id: r.id,
@@ -120,6 +122,7 @@ export default async function MarkerByTokenPage({
             saved_at: r.graded_at,
             current_comment: r.primary_comment,
             absent: r.absent,
+            mcq_score: r.mcq_score,
           },
   );
 
@@ -279,6 +282,7 @@ export default async function MarkerByTokenPage({
         isSecondary={isSecondary}
         isResolving={isResolving}
         markingOpen={markingOpen}
+        mcqEnabled={exam.mcq_enabled}
       />
 
       {markingOpen && (

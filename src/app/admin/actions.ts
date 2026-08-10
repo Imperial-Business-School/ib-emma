@@ -23,9 +23,12 @@ async function getOrigin(): Promise<string> {
 function parseDeadline(input: FormDataEntryValue | null): Date | null {
   const v = String(input ?? "").trim();
   if (!v) return null;
-  // <input type="datetime-local"> sends "YYYY-MM-DDTHH:MM" with no
-  // timezone info. Interpret as Europe/London (the admin is in the UK)
-  // so the stored UTC instant matches what they typed even during BST.
+  // <input type="date"> sends "YYYY-MM-DD"; <input type="datetime-local">
+  // sends "YYYY-MM-DDTHH:MM". Both are interpreted as UK-local.
+  // Marker deadlines from a bare date default to 23:00 UTC.
+  if (/^\d{4}-\d{2}-\d{2}$/.test(v)) {
+    return new Date(`${v}T23:00:00.000Z`);
+  }
   const d = parseUkLocalDateTime(v);
   if (!d) throw new Error("Deadline is not a valid date/time");
   return d;
@@ -47,15 +50,40 @@ function parseSamplingMode(v: FormDataEntryValue | null): "standard" | "full" {
 export async function createExamAction(formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
   const code = String(formData.get("code") ?? "").trim() || null;
+  const moduleName =
+    String(formData.get("module_name") ?? "").trim() || null;
+  const academicYearRaw =
+    String(formData.get("academic_year") ?? "").trim() || null;
+  const academicYear =
+    academicYearRaw && /^\d{2}\/\d{2}$/.test(academicYearRaw)
+      ? academicYearRaw
+      : null;
   const samplingMode = parseSamplingMode(formData.get("sampling_mode"));
   const primaryDeadline = parseDeadline(formData.get("primary_deadline"));
   const secondaryDeadline = parseDeadline(formData.get("secondary_deadline"));
   const programmeIdRaw = String(formData.get("programme_id") ?? "").trim();
   const programmeId = programmeIdRaw ? Number(programmeIdRaw) : null;
+  const mcqEnabled = formData.get("mcq_enabled") === "on";
+  const mcqWeightingRaw = String(formData.get("mcq_weighting") ?? "").trim();
+  let mcqWeighting: number | null = null;
+  if (mcqEnabled) {
+    if (!/^\d+(\.\d{1,2})?$/.test(mcqWeightingRaw)) {
+      throw new Error(
+        "MCQ weighting must be a number 0-100 with up to 2 decimal places",
+      );
+    }
+    mcqWeighting = Number(mcqWeightingRaw);
+    if (mcqWeighting < 0 || mcqWeighting > 100) {
+      throw new Error("MCQ weighting must be between 0 and 100");
+    }
+  }
   if (programmeIdRaw && !Number.isFinite(programmeId)) {
     throw new Error("Programme selection is invalid");
   }
   if (!name) throw new Error("Exam name is required");
+  if (!primaryDeadline) {
+    throw new Error("Primary marker deadline is required");
+  }
 
   const primaryEmail = parseEmail(formData.get("primary_email"));
   const primaryName =
@@ -65,7 +93,9 @@ export async function createExamAction(formData: FormData) {
     String(formData.get("secondary_name") ?? "").trim() || null;
 
   if (primaryEmail === secondaryEmail) {
-    throw new Error("Primary and secondary markers must be different people");
+    throw new Error(
+      "Primary and secondary markers must have different email addresses",
+    );
   }
 
   const primary = await findOrCreateUser(primaryEmail, primaryName);
@@ -73,22 +103,28 @@ export async function createExamAction(formData: FormData) {
 
   const row = await queryOne<{ id: number }>(
     `INSERT INTO exams
-       (name, code, primary_marker_id, secondary_marker_id, status,
-        sampling_mode, primary_access_token, secondary_access_token,
-        primary_deadline, secondary_deadline, programme_id)
-     VALUES ($1, $2, $3, $4, 'setup', $5, $6, $7, $8, $9, $10)
+       (name, code, module_name, academic_year, primary_marker_id,
+        secondary_marker_id, status, sampling_mode,
+        primary_access_token, secondary_access_token,
+        primary_deadline, secondary_deadline, programme_id,
+        mcq_enabled, mcq_weighting)
+     VALUES ($1, $2, $3, $4, $5, $6, 'setup', $7, $8, $9, $10, $11, $12, $13, $14)
      RETURNING id`,
     [
       name,
       code,
+      moduleName,
+      academicYear,
       primary.id,
       secondary.id,
       samplingMode,
       randomToken(),
       randomToken(),
-      primaryDeadline?.toISOString() ?? null,
+      primaryDeadline.toISOString(),
       secondaryDeadline?.toISOString() ?? null,
       programmeId,
+      mcqEnabled,
+      mcqWeighting,
     ],
   );
   if (!row) throw new Error("Failed to create exam");
@@ -108,6 +144,156 @@ export async function resetSeatsAction(examId: number) {
     );
   }
   await query("DELETE FROM submissions WHERE exam_id = $1", [examId]);
+  revalidatePath(`/admin/exams/${examId}`);
+}
+
+export async function setMcqScoreAction(
+  examId: number,
+  submissionId: number,
+  formData: FormData,
+) {
+  const raw = String(formData.get("mcq_score") ?? "").trim();
+  if (raw !== "" && !/^\d+(\.\d{1,2})?$/.test(raw)) {
+    throw new Error(
+      "MCQ score must be a number with up to 2 decimal places",
+    );
+  }
+  await query(
+    "UPDATE submissions SET mcq_score = $1 WHERE id = $2 AND exam_id = $3",
+    [raw === "" ? null : raw, submissionId, examId],
+  );
+  revalidatePath(`/admin/exams/${examId}`);
+}
+
+export async function uploadMcqCsvAction(
+  examId: number,
+  formData: FormData,
+): Promise<{ saved: number; skipped: string[] }> {
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) {
+    throw new Error("No file uploaded");
+  }
+  const text = await file.text();
+  const rows = parseCsv(text);
+  if (rows.length === 0) throw new Error("CSV is empty");
+
+  const first = rows[0].map((s) => s.trim().toLowerCase());
+  const hasHeader = first.some((c) => /cid|seat|mcq|score/i.test(c));
+  let cidIdx = 0;
+  let seatIdx = 1;
+  let scoreIdx = 2;
+  let start = 0;
+  if (hasHeader) {
+    start = 1;
+    const findIdx = (patterns: RegExp[]) =>
+      first.findIndex((c) => patterns.some((p) => p.test(c)));
+    const c = findIdx([/^cid\b/i, /student.?id/i]);
+    const s = findIdx([/^seat/i, /seat.?number/i]);
+    const m = findIdx([/mcq/i, /score/i]);
+    if (c >= 0) cidIdx = c;
+    if (s >= 0) seatIdx = s;
+    if (m >= 0) scoreIdx = m;
+  }
+
+  const subs = await query<{ id: number; seat_number: string; cid: string }>(
+    "SELECT id, seat_number, cid FROM submissions WHERE exam_id = $1",
+    [examId],
+  );
+  const bySeat = new Map(subs.map((r) => [r.seat_number, r]));
+  const byCid = new Map(subs.map((r) => [r.cid, r]));
+
+  const skipped: string[] = [];
+  let saved = 0;
+  for (let i = start; i < rows.length; i++) {
+    const r = rows[i];
+    const cid = (r[cidIdx] ?? "").trim();
+    const seat = (r[seatIdx] ?? "").trim();
+    const score = (r[scoreIdx] ?? "").trim();
+    if (!cid && !seat) continue;
+    const target = (cid && byCid.get(cid)) || (seat && bySeat.get(seat));
+    if (!target) {
+      skipped.push(`Row for ${cid || seat}: not in exam`);
+      continue;
+    }
+    if (score !== "" && !/^\d+(\.\d{1,2})?$/.test(score)) {
+      skipped.push(
+        `Seat ${target.seat_number}: MCQ score "${score}" is not a valid number`,
+      );
+      continue;
+    }
+    await query(
+      "UPDATE submissions SET mcq_score = $1 WHERE id = $2",
+      [score === "" ? null : score, target.id],
+    );
+    saved++;
+  }
+  revalidatePath(`/admin/exams/${examId}`);
+  return { saved, skipped };
+}
+
+export async function updateMcqWeightingAction(
+  examId: number,
+  formData: FormData,
+) {
+  const raw = String(formData.get("mcq_weighting") ?? "").trim();
+  if (raw === "") {
+    await query(
+      "UPDATE exams SET mcq_weighting = NULL WHERE id = $1",
+      [examId],
+    );
+  } else {
+    if (!/^\d+(\.\d{1,2})?$/.test(raw)) {
+      throw new Error(
+        "MCQ weighting must be a number 0-100 with up to 2 decimal places",
+      );
+    }
+    const n = Number(raw);
+    if (n < 0 || n > 100) {
+      throw new Error("MCQ weighting must be between 0 and 100");
+    }
+    await query(
+      "UPDATE exams SET mcq_weighting = $1 WHERE id = $2",
+      [n, examId],
+    );
+  }
+  revalidatePath(`/admin/exams/${examId}`);
+}
+
+// Admin grade override. Writes to whichever column matches the given
+// field, appending an override note that identifies the acting admin.
+export async function adminOverrideGradeAction(
+  examId: number,
+  submissionId: number,
+  field: "grade" | "secondary_grade" | "final_grade" | "mcq_score",
+  formData: FormData,
+) {
+  const { getActingAdmin } = await import("@/lib/actor");
+  const acting = await getActingAdmin();
+  const raw = String(formData.get("value") ?? "").trim();
+  if (raw !== "" && !/^\d+(\.\d{1,2})?$/.test(raw)) {
+    throw new Error(
+      "Grade must be a number with up to 2 decimal places",
+    );
+  }
+  const value = raw === "" ? null : raw;
+  const note = `Grade (${field}) was changed by Admin user ${
+    acting?.name ?? "unknown"
+  } on ${new Date().toISOString()}`;
+  // Guard column name against injection.
+  const allowed = new Set([
+    "grade",
+    "secondary_grade",
+    "final_grade",
+    "mcq_score",
+  ]);
+  if (!allowed.has(field)) throw new Error("Invalid field");
+  await query(
+    `UPDATE submissions
+     SET ${field} = $1,
+         override_note = COALESCE(override_note || E'\\n', '') || $2
+     WHERE id = $3 AND exam_id = $4`,
+    [value, note, submissionId, examId],
+  );
   revalidatePath(`/admin/exams/${examId}`);
 }
 
@@ -290,6 +476,20 @@ export async function startPrimaryMarkingAction(examId: number) {
   );
   if (!seats || seats.n === 0) {
     throw new Error("Upload seat numbers before starting marking");
+  }
+
+  // If MCQ is enabled, every non-absent student must have an MCQ score.
+  if (exam.mcq_enabled) {
+    const missing = await queryOne<{ n: number }>(
+      `SELECT COUNT(*)::int AS n FROM submissions
+       WHERE exam_id = $1 AND absent = false AND mcq_score IS NULL`,
+      [examId],
+    );
+    if ((missing?.n ?? 0) > 0) {
+      throw new Error(
+        `MCQ is enabled: ${missing?.n} student(s) still need an MCQ score before primary marking can start.`,
+      );
+    }
   }
 
   await query(

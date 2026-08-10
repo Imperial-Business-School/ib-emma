@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { headers } from "next/headers";
 import {
+  ACADEMIC_YEARS,
+  DEFAULT_ACADEMIC_YEAR,
   EXAM_STATUS_LABEL,
   query,
   queryOne,
@@ -9,8 +11,8 @@ import {
 } from "@/lib/db";
 import { STATUS_BADGE_CLASS } from "@/lib/examStatus";
 import { sweepDeadlineStatuses } from "@/lib/deadlines";
-import { createExamAction } from "./actions";
 import { ExamFilters } from "./ExamFilters";
+import { CreateExamForm } from "./CreateExamForm";
 import { formatDate } from "@/lib/datetime";
 
 async function getOrigin(): Promise<string> {
@@ -153,127 +155,16 @@ export default async function AdminHome({
           Enter both markers and pick a sampling mode. The sampling mode is
           locked once primary marking starts.
         </p>
-        <form action={createExamAction} className="mt-4 grid gap-3 md:grid-cols-2">
-          <input
-            name="name"
-            required
-            placeholder="Exam name (e.g. MATH40001 Analysis I)"
-            className="rounded border px-3 py-2 md:col-span-2"
-          />
-          <input
-            name="code"
-            placeholder="Module code (optional)"
-            className="rounded border px-3 py-2 md:col-span-2"
-          />
-          <label className="text-sm md:col-span-2">
-            <span className="block text-xs font-medium text-slate-600">
-              Programme (optional)
-            </span>
-            <select
-              name="programme_id"
-              defaultValue=""
-              className="mt-1 w-full rounded border bg-white px-3 py-2 text-sm"
-            >
-              <option value="">— No programme —</option>
-              {programmes.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name} ({p.programme_id}, {p.level})
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="text-sm">
-            <span className="block text-xs font-medium text-slate-600">
-              Primary marker deadline (optional)
-            </span>
-            <input
-              type="datetime-local"
-              name="primary_deadline"
-              className="mt-1 w-full rounded border px-3 py-2 text-sm"
-            />
-          </label>
-          <label className="text-sm">
-            <span className="block text-xs font-medium text-slate-600">
-              Second marker deadline (optional)
-            </span>
-            <input
-              type="datetime-local"
-              name="secondary_deadline"
-              className="mt-1 w-full rounded border px-3 py-2 text-sm"
-            />
-          </label>
-          <fieldset className="rounded border bg-slate-50 p-3 md:col-span-2">
-            <legend className="px-1 text-xs font-semibold uppercase text-slate-500">
-              Second marking
-            </legend>
-            <label className="mt-2 flex items-start gap-2 text-sm">
-              <input
-                type="radio"
-                name="sampling_mode"
-                value="standard"
-                defaultChecked
-                className="mt-1"
-              />
-              <span>
-                <strong>Standard sampling</strong> — at least 10% of papers,
-                including all grade-boundary papers (39–41, 49–51, 59–61, 69–71,
-                79–81).
-              </span>
-            </label>
-            <label className="mt-2 flex items-start gap-2 text-sm">
-              <input
-                type="radio"
-                name="sampling_mode"
-                value="full"
-                className="mt-1"
-              />
-              <span>
-                <strong>Full second marking</strong> — every paper is marked
-                by the second marker.
-              </span>
-            </label>
-          </fieldset>
-          <div className="rounded border bg-slate-50 p-3">
-            <p className="text-xs font-semibold uppercase text-slate-500">
-              Primary marker
-            </p>
-            <input
-              type="email"
-              name="primary_email"
-              required
-              placeholder="primary@imperial.ac.uk"
-              className="mt-2 w-full rounded border px-3 py-2 text-sm"
-            />
-            <input
-              name="primary_name"
-              placeholder="Name (optional)"
-              className="mt-2 w-full rounded border px-3 py-2 text-sm"
-            />
-          </div>
-          <div className="rounded border bg-slate-50 p-3">
-            <p className="text-xs font-semibold uppercase text-slate-500">
-              Second marker
-            </p>
-            <input
-              type="email"
-              name="secondary_email"
-              required
-              placeholder="second@imperial.ac.uk"
-              className="mt-2 w-full rounded border px-3 py-2 text-sm"
-            />
-            <input
-              name="secondary_name"
-              placeholder="Name (optional)"
-              className="mt-2 w-full rounded border px-3 py-2 text-sm"
-            />
-          </div>
-          <button
-            type="submit"
-            className="rounded bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 md:col-span-2"
-          >
-            Create exam
-          </button>
-        </form>
+        <CreateExamForm
+          programmes={programmes.map((p) => ({
+            id: p.id,
+            name: p.name,
+            programme_id: p.programme_id,
+            level: p.level,
+          }))}
+          academicYears={[...ACADEMIC_YEARS]}
+          defaultAcademicYear={DEFAULT_ACADEMIC_YEAR}
+        />
       </section>
 
       <ExamFilters

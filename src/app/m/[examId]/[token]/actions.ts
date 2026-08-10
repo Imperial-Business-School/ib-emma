@@ -98,6 +98,24 @@ export async function saveGradesByTokenAction(
         throw new Error("That seat does not need primary-marker review");
       }
     }
+    // Secondary marker giving a grade that doesn't match the primary's must
+    // provide a comment.
+    if (role === "secondary" && !inResolutionPhase) {
+      const newGrade = u.grade.trim();
+      const primaryGrade = row.grade;
+      if (
+        newGrade !== "" &&
+        primaryGrade != null &&
+        newGrade !== primaryGrade
+      ) {
+        const c = (u.comment ?? "").trim();
+        if (c === "") {
+          throw new Error(
+            `Seat ${row.id}: your grade differs from the primary marker's, please add a comment before saving.`,
+          );
+        }
+      }
+    }
   }
 
   const results: { id: number; saved_at: string | null }[] = [];
@@ -351,7 +369,18 @@ export async function completePrimaryMarkingByTokenAction(
     throw new Error(`${ungraded} seat(s) still need a grade before completion`);
   }
 
-  const sampleIds = computeSampleIdsForMode(subs, exam.sampling_mode);
+  // Load programme level to pick the right fail threshold.
+  const programme = exam.programme_id
+    ? await queryOne<{ level: "MSc" | "MBA" | "BSc" }>(
+        "SELECT level FROM programmes WHERE id = $1",
+        [exam.programme_id],
+      )
+    : null;
+  const sampleIds = computeSampleIdsForMode(
+    subs,
+    exam.sampling_mode,
+    programme?.level ?? null,
+  );
   await query("UPDATE submissions SET in_sample = false WHERE exam_id = $1", [
     examId,
   ]);

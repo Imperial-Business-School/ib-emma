@@ -17,14 +17,18 @@ import {
   reassignMarkerAction,
   regenerateMarkerTokenAction,
   resetSeatsAction,
+  setMcqScoreAction,
   startPrimaryMarkingAction,
   startSecondaryMarkingAction,
   toggleAbsentAction,
   toggleInSampleAction,
+  updateMcqWeightingAction,
   updatePrimaryDeadlineAction,
   uploadSeatsAction,
 } from "../../actions";
 import { ResetSeatsForm } from "./ResetSeatsForm";
+import { computeWeightedGrade } from "@/lib/weighted";
+import { McqUploadPanel } from "./McqUploadPanel";
 import { DeleteExamForm } from "./DeleteExamForm";
 import { formatDateTime, toDatetimeLocalValue } from "@/lib/datetime";
 
@@ -359,6 +363,48 @@ export default async function AdminExamPage({
         </section>
       )}
 
+      {exam.mcq_enabled && (
+        <section className="rounded-lg border bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-semibold">MCQ element</h2>
+          <p className="mt-1 text-sm text-slate-600">
+            MCQ scores contribute to each student&apos;s weighted grade at
+            the configured weighting. Weighting can be updated at any time.
+          </p>
+          <form
+            action={async (fd) => {
+              "use server";
+              await updateMcqWeightingAction(exam.id, fd);
+            }}
+            className="mt-3 flex flex-wrap items-end gap-2"
+          >
+            <label className="text-sm">
+              <span className="block text-xs font-medium text-slate-600">
+                Weighting (%)
+              </span>
+              <input
+                name="mcq_weighting"
+                type="text"
+                defaultValue={exam.mcq_weighting ?? ""}
+                pattern="^\d+(\.\d{1,2})?$"
+                inputMode="decimal"
+                className="mt-1 w-40 rounded border px-3 py-2 text-sm"
+              />
+            </label>
+            <button
+              type="submit"
+              className="rounded bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-700"
+            >
+              Save weighting
+            </button>
+          </form>
+          {exam.status === "setup" && (
+            <div className="mt-4">
+              <McqUploadPanel examId={exam.id} />
+            </div>
+          )}
+        </section>
+      )}
+
       <section className="rounded-lg border bg-white shadow-sm">
         <div className="border-b px-4 py-3">
           <h2 className="text-lg font-semibold">
@@ -380,15 +426,21 @@ export default async function AdminExamPage({
         <table className="w-full text-sm">
           <thead className="border-b bg-slate-50 text-left text-slate-600">
             <tr>
-              <th className="px-4 py-2">Seat</th>
               <th className="px-4 py-2">CID</th>
+              <th className="px-4 py-2">Seat</th>
               <th className="px-4 py-2 text-center">Absent</th>
+              {exam.mcq_enabled && (
+                <th className="px-4 py-2">MCQ score</th>
+              )}
               <th className="px-4 py-2">Primary grade</th>
               <th className="px-4 py-2">Comment</th>
               <th className="px-4 py-2 text-center">Sample</th>
               <th className="px-4 py-2">Secondary grade</th>
               <th className="px-4 py-2">Comment</th>
               {showFinalColumn && <th className="px-4 py-2">Final grade</th>}
+              {showFinalColumn && exam.mcq_enabled && (
+                <th className="px-4 py-2">Weighted grade</th>
+              )}
               <th className="px-4 py-2" />
             </tr>
           </thead>
@@ -396,7 +448,12 @@ export default async function AdminExamPage({
             {submissions.length === 0 && (
               <tr>
                 <td
-                  colSpan={showFinalColumn ? 10 : 9}
+                  colSpan={
+                    9 +
+                    (showFinalColumn ? 1 : 0) +
+                    (exam.mcq_enabled ? 1 : 0) +
+                    (showFinalColumn && exam.mcq_enabled ? 1 : 0)
+                  }
                   className="px-4 py-8 text-center text-slate-500"
                 >
                   No seats uploaded yet.
@@ -421,8 +478,8 @@ export default async function AdminExamPage({
                   key={s.id}
                   className={`border-b last:border-b-0 align-top ${rowClass}`}
                 >
-                  <td className="px-4 py-2 font-mono">{s.seat_number}</td>
                   <td className="px-4 py-2 font-mono">{s.cid}</td>
+                  <td className="px-4 py-2 font-mono">{s.seat_number}</td>
                   <td className="px-4 py-2 text-center">
                     <form
                       action={async () => {
@@ -452,6 +509,37 @@ export default async function AdminExamPage({
                       </button>
                     </form>
                   </td>
+                  {exam.mcq_enabled && (
+                    <td className="px-4 py-2">
+                      {s.absent ? (
+                        <span className="text-slate-400">n/a</span>
+                      ) : (
+                        <form
+                          action={async (fd) => {
+                            "use server";
+                            await setMcqScoreAction(exam.id, s.id, fd);
+                          }}
+                          className="flex gap-1"
+                        >
+                          <input
+                            name="mcq_score"
+                            defaultValue={s.mcq_score ?? ""}
+                            placeholder="—"
+                            pattern="^\d+(\.\d{1,2})?$"
+                            inputMode="decimal"
+                            title="Number with up to 2 decimal places"
+                            className="w-20 rounded border px-2 py-1 text-sm"
+                          />
+                          <button
+                            type="submit"
+                            className="rounded border bg-white px-2 py-1 text-xs hover:bg-slate-50"
+                          >
+                            Save
+                          </button>
+                        </form>
+                      )}
+                    </td>
+                  )}
                   <td className="px-4 py-2">
                     {s.absent ? (
                       <span className="text-slate-400">—</span>
@@ -523,6 +611,20 @@ export default async function AdminExamPage({
                             <span className="text-slate-400">—</span>
                           )}
                         </span>
+                      )}
+                    </td>
+                  )}
+                  {showFinalColumn && exam.mcq_enabled && (
+                    <td className="px-4 py-2 font-medium">
+                      {s.absent ? (
+                        <span className="text-slate-400">—</span>
+                      ) : (
+                        (computeWeightedGrade(
+                          s.final_grade,
+                          s.mcq_score,
+                          exam.mcq_weighting,
+                          exam.mcq_enabled,
+                        ) ?? <span className="text-slate-400">—</span>)
                       )}
                     </td>
                   )}

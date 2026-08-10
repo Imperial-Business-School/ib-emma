@@ -1,10 +1,17 @@
 import Link from "next/link";
+import { getActingAdmin, getAllAdmins } from "@/lib/actor";
+import { ActingAsPicker } from "./ActingAsPicker";
 
-export default function AdminLayout({
+export default async function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const [current, admins] = await Promise.all([
+    getActingAdmin(),
+    getAllAdmins(),
+  ]);
+
   return (
     <>
       <header className="border-b bg-white">
@@ -20,10 +27,7 @@ export default function AdminLayout({
             </span>
           </Link>
           <nav className="flex items-center gap-4 text-sm">
-            <Link
-              href="/admin"
-              className="text-slate-600 hover:text-slate-900"
-            >
+            <Link href="/admin" className="text-slate-600 hover:text-slate-900">
               Exams
             </Link>
             <Link
@@ -33,11 +37,21 @@ export default function AdminLayout({
               Programmes
             </Link>
             <Link
+              href="/admin/admins"
+              className="text-slate-600 hover:text-slate-900"
+            >
+              Admin users
+            </Link>
+            <Link
               href="/admin/emails"
               className="text-slate-600 hover:text-slate-900"
             >
               Email log
             </Link>
+            <ActingAsPicker
+              admins={admins.map((a) => ({ id: a.id, name: a.name }))}
+              currentId={current?.id ?? null}
+            />
           </nav>
         </div>
       </header>

@@ -12,6 +12,7 @@ export type GradeRow = {
   saved_at: string | null;
   current_comment: string | null;
   absent?: boolean;
+  mcq_score?: string | null;
   // For secondary marker: the primary marker's grade.
   primary_grade?: string | null;
   // For primary marker in resolution view:
@@ -19,6 +20,29 @@ export type GradeRow = {
   secondary_grade?: string | null;
   secondary_comment?: string | null;
 };
+
+type SortKey =
+  | "seat"
+  | "grade"
+  | "primary_grade"
+  | "mcq"
+  | "saved";
+type SortDir = "asc" | "desc";
+
+function naturalCompareSeat(a: string, b: string): number {
+  if (a.length !== b.length) return a.length - b.length;
+  return a.localeCompare(b);
+}
+function numericCompare(a: string | null | undefined, b: string | null | undefined): number {
+  const aN = a == null ? NaN : Number(a);
+  const bN = b == null ? NaN : Number(b);
+  const aBad = !Number.isFinite(aN);
+  const bBad = !Number.isFinite(bN);
+  if (aBad && bBad) return 0;
+  if (aBad) return 1;
+  if (bBad) return -1;
+  return aN - bN;
+}
 
 type SaveResult = { id: number; saved_at: string | null };
 
@@ -33,6 +57,7 @@ export function GradeTable({
   isSecondary,
   isResolving,
   markingOpen,
+  mcqEnabled = false,
 }: {
   examId: number;
   token: string;
@@ -40,7 +65,34 @@ export function GradeTable({
   isSecondary: boolean;
   isResolving: boolean;
   markingOpen: boolean;
+  mcqEnabled?: boolean;
 }) {
+  const [sort, setSort] = useState<{ key: SortKey; dir: SortDir }>({
+    key: "seat",
+    dir: "asc",
+  });
+  function onSort(key: SortKey) {
+    setSort((prev) =>
+      prev.key === key
+        ? { key, dir: prev.dir === "asc" ? "desc" : "asc" }
+        : { key, dir: "asc" },
+    );
+  }
+  const sortedRows = [...rows].sort((a, b) => {
+    const dir = sort.dir === "asc" ? 1 : -1;
+    switch (sort.key) {
+      case "seat":
+        return dir * naturalCompareSeat(a.seat_number, b.seat_number);
+      case "grade":
+        return dir * numericCompare(a.current_grade, b.current_grade);
+      case "primary_grade":
+        return dir * numericCompare(a.primary_grade, b.primary_grade);
+      case "mcq":
+        return dir * numericCompare(a.mcq_score, b.mcq_score);
+      case "saved":
+        return dir * (a.saved_at ?? "").localeCompare(b.saved_at ?? "");
+    }
+  });
   const [values, setValues] = useState<Record<number, string>>(() =>
     Object.fromEntries(rows.map((r) => [r.id, r.current_grade ?? ""])),
   );
@@ -197,29 +249,57 @@ export function GradeTable({
       <table className="w-full text-sm">
         <thead className="border-b bg-slate-50 text-left text-slate-600">
           <tr>
-            <th className="px-4 py-2 w-20">Seat</th>
+            <SortableTh
+              label="Seat"
+              active={sort.key === "seat"}
+              dir={sort.dir}
+              onClick={() => onSort("seat")}
+              className="w-20"
+            />
             {showPrimary && (
-              <th className="px-4 py-2">
-                {isResolving ? "Primary grade" : "Primary grade"}
-              </th>
+              <SortableTh
+                label="Primary grade"
+                active={sort.key === "primary_grade"}
+                dir={sort.dir}
+                onClick={() => onSort("primary_grade")}
+              />
             )}
             {isResolving && <th className="px-4 py-2">Primary comment</th>}
             {showSecondary && <th className="px-4 py-2">Secondary grade</th>}
             {isResolving && <th className="px-4 py-2">Secondary comment</th>}
-            <th className="px-4 py-2">{yourLabel}</th>
+            {mcqEnabled && (
+              <SortableTh
+                label="MCQ score"
+                active={sort.key === "mcq"}
+                dir={sort.dir}
+                onClick={() => onSort("mcq")}
+              />
+            )}
+            <SortableTh
+              label={yourLabel}
+              active={sort.key === "grade"}
+              dir={sort.dir}
+              onClick={() => onSort("grade")}
+            />
             <th className="px-4 py-2">Comment</th>
-            <th className="px-4 py-2">Saved</th>
+            <SortableTh
+              label="Saved"
+              active={sort.key === "saved"}
+              dir={sort.dir}
+              onClick={() => onSort("saved")}
+            />
           </tr>
         </thead>
         <tbody>
-          {rows.length === 0 && (
+          {sortedRows.length === 0 && (
             <tr>
               <td
                 colSpan={
                   3 +
                   (showPrimary ? 1 : 0) +
                   (showSecondary ? 1 : 0) +
-                  (isResolving ? 2 : 0)
+                  (isResolving ? 2 : 0) +
+                  (mcqEnabled ? 1 : 0)
                 }
                 className="px-4 py-8 text-center text-slate-500"
               >
@@ -231,7 +311,7 @@ export function GradeTable({
               </td>
             </tr>
           )}
-          {rows.map((r) => {
+          {sortedRows.map((r) => {
             const value = values[r.id] ?? "";
             const comment = comments[r.id] ?? "";
             const dirty =
@@ -259,6 +339,11 @@ export function GradeTable({
                 {isResolving && (
                   <td className="px-4 py-2 text-slate-700">
                     {r.secondary_comment ?? "—"}
+                  </td>
+                )}
+                {mcqEnabled && (
+                  <td className="px-4 py-2 font-mono text-slate-700">
+                    {r.absent ? "—" : (r.mcq_score ?? "—")}
                   </td>
                 )}
                 <td className="px-4 py-2">
@@ -323,5 +408,34 @@ export function GradeTable({
         </tbody>
       </table>
     </section>
+  );
+}
+
+function SortableTh({
+  label,
+  active,
+  dir,
+  onClick,
+  className,
+}: {
+  label: string;
+  active: boolean;
+  dir: SortDir;
+  onClick: () => void;
+  className?: string;
+}) {
+  return (
+    <th className={`px-4 py-2 ${className ?? ""}`}>
+      <button
+        type="button"
+        onClick={onClick}
+        className="hover:text-slate-900"
+      >
+        {label}
+        <span className="ml-1 text-slate-400">
+          {active ? (dir === "asc" ? "↑" : "↓") : "↕"}
+        </span>
+      </button>
+    </th>
   );
 }
