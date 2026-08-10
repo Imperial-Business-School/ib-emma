@@ -6,7 +6,7 @@ import {
   isSecondaryMarkingPhase,
 } from "@/lib/examStatus";
 import { sweepDeadlineStatuses } from "@/lib/deadlines";
-import { formatDateTime } from "@/lib/datetime";
+import { formatDateOnly } from "@/lib/datetime";
 import {
   completeFinalMarkingByTokenAction,
   completePrimaryMarkingByTokenAction,
@@ -140,10 +140,10 @@ export default async function MarkerByTokenPage({
     (isSecondary && isSecondaryMarkingPhase(exam.status));
 
   const myDeadline =
-    isPrimary && exam.primary_deadline
-      ? new Date(exam.primary_deadline)
-      : isSecondary && exam.secondary_deadline
-        ? new Date(exam.secondary_deadline)
+    isPrimary && exam.primary_deadline_date
+      ? exam.primary_deadline_date
+      : isSecondary && exam.secondary_deadline_date
+        ? exam.secondary_deadline_date
         : null;
   const showLateBanner =
     exam.status === "first_marking_late" ||
@@ -201,8 +201,8 @@ export default async function MarkerByTokenPage({
                   : "Deadline"}
             </span>{" "}
             <span>
-              Your grades must be submitted by{" "}
-              <strong>{formatDateTime(myDeadline)}</strong> (UK time).
+              Your grades must be submitted by the end of{" "}
+              <strong>{formatDateOnly(myDeadline)}</strong> (UK time).
             </span>
           </div>
         )}

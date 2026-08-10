@@ -20,17 +20,15 @@ async function getOrigin(): Promise<string> {
   return `${proto}://${host}`;
 }
 
-function parseDeadline(input: FormDataEntryValue | null): Date | null {
+// Deadlines are now stored as a bare 'YYYY-MM-DD' UK date. Overdue
+// detection treats the deadline as passed once local UK time crosses
+// midnight into the following date -- see endOfDeadlineDay().
+function parseDeadline(input: FormDataEntryValue | null): string | null {
   const v = String(input ?? "").trim();
   if (!v) return null;
-  // <input type="date"> sends "YYYY-MM-DD"; <input type="datetime-local">
-  // sends "YYYY-MM-DDTHH:MM". Both are interpreted as UK-local so the
-  // display in Europe/London matches what the admin picked.
-  // Bare dates get the fixed cut-off time of 23:00 UK time.
-  const withTime = /^\d{4}-\d{2}-\d{2}$/.test(v) ? `${v}T23:00` : v;
-  const d = parseUkLocalDateTime(withTime);
-  if (!d) throw new Error("Deadline is not a valid date/time");
-  return d;
+  const m = v.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) throw new Error("Deadline is not a valid date");
+  return `${m[1]}-${m[2]}-${m[3]}`;
 }
 
 function parseEmail(input: FormDataEntryValue | null): string {
@@ -105,7 +103,7 @@ export async function createExamAction(formData: FormData) {
        (name, code, module_name, academic_year, primary_marker_id,
         secondary_marker_id, status, sampling_mode,
         primary_access_token, secondary_access_token,
-        primary_deadline, secondary_deadline, programme_id,
+        primary_deadline_date, secondary_deadline_date, programme_id,
         mcq_enabled, mcq_weighting)
      VALUES ($1, $2, $3, $4, $5, $6, 'setup', $7, $8, $9, $10, $11, $12, $13, $14)
      RETURNING id`,
@@ -119,8 +117,8 @@ export async function createExamAction(formData: FormData) {
       samplingMode,
       randomToken(),
       randomToken(),
-      primaryDeadline.toISOString(),
-      secondaryDeadline?.toISOString() ?? null,
+      primaryDeadline,
+      secondaryDeadline,
       programmeId,
       mcqEnabled,
       mcqWeighting,
@@ -331,8 +329,8 @@ export async function updatePrimaryDeadlineAction(
 ) {
   const deadline = parseDeadline(formData.get("primary_deadline"));
   await query(
-    "UPDATE exams SET primary_deadline = $1 WHERE id = $2 AND status = 'setup'",
-    [deadline?.toISOString() ?? null, examId],
+    "UPDATE exams SET primary_deadline_date = $1 WHERE id = $2 AND status = 'setup'",
+    [deadline, examId],
   );
   revalidatePath(`/admin/exams/${examId}`);
 }
@@ -511,7 +509,7 @@ export async function startPrimaryMarkingAction(examId: number) {
         examName: exam.name,
         examCode: exam.code,
         role: "primary",
-        deadline: exam.primary_deadline ? new Date(exam.primary_deadline) : null,
+        deadline: exam.primary_deadline_date,
         url: markerUrl(origin, exam.id, exam.primary_access_token),
         examId: exam.id,
       }),
@@ -570,11 +568,11 @@ export async function startSecondaryMarkingAction(
   await query(
     `UPDATE exams
      SET status = 'secondary_marking',
-         secondary_deadline = $1,
+         secondary_deadline_date = $1,
          secondary_overdue_notified_at = NULL,
          secondary_late_notified_at = NULL
      WHERE id = $2`,
-    [secondaryDeadline.toISOString(), examId],
+    [secondaryDeadline, examId],
   );
 
   // Stub email to the second marker.
@@ -594,6 +592,7 @@ export async function startSecondaryMarkingAction(
           examCode: exam.code,
           role: "secondary",
           deadline: secondaryDeadline,
+          // secondaryDeadline is now a 'YYYY-MM-DD' string
           url: markerUrl(origin, exam.id, exam.secondary_access_token),
           examId: exam.id,
         }),

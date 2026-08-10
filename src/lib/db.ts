@@ -98,10 +98,26 @@ async function initSchema(): Promise<void> {
     ALTER TABLE exams ADD COLUMN IF NOT EXISTS sampling_mode TEXT NOT NULL DEFAULT 'standard';
     ALTER TABLE exams ADD COLUMN IF NOT EXISTS primary_deadline TIMESTAMPTZ;
     ALTER TABLE exams ADD COLUMN IF NOT EXISTS secondary_deadline TIMESTAMPTZ;
+    ALTER TABLE exams ADD COLUMN IF NOT EXISTS primary_deadline_date DATE;
+    ALTER TABLE exams ADD COLUMN IF NOT EXISTS secondary_deadline_date DATE;
     ALTER TABLE exams ADD COLUMN IF NOT EXISTS primary_overdue_notified_at TIMESTAMPTZ;
     ALTER TABLE exams ADD COLUMN IF NOT EXISTS primary_late_notified_at TIMESTAMPTZ;
     ALTER TABLE exams ADD COLUMN IF NOT EXISTS secondary_overdue_notified_at TIMESTAMPTZ;
     ALTER TABLE exams ADD COLUMN IF NOT EXISTS secondary_late_notified_at TIMESTAMPTZ;
+
+    -- Backfill new DATE deadline columns from existing timestamps. Shifts
+    -- back 1 hour first, so both legacy '23:00 UTC' rows and current
+    -- '23:00 UK-local' rows end up on the UK calendar date the admin
+    -- originally picked.
+    UPDATE exams
+    SET primary_deadline_date =
+      ((primary_deadline - INTERVAL '1 hour') AT TIME ZONE 'Europe/London')::date
+    WHERE primary_deadline IS NOT NULL AND primary_deadline_date IS NULL;
+
+    UPDATE exams
+    SET secondary_deadline_date =
+      ((secondary_deadline - INTERVAL '1 hour') AT TIME ZONE 'Europe/London')::date
+    WHERE secondary_deadline IS NOT NULL AND secondary_deadline_date IS NULL;
 
     CREATE INDEX IF NOT EXISTS idx_exams_status ON exams(status);
     CREATE INDEX IF NOT EXISTS idx_exams_created_at ON exams(created_at DESC);
@@ -240,8 +256,13 @@ export type Exam = {
   secondary_completed_at: string | null;
   primary_access_token: string | null;
   secondary_access_token: string | null;
+  // Legacy TIMESTAMPTZ columns; retained for historical audit but the
+  // canonical deadline is now the DATE below. Interpret 'deadline passed'
+  // as midnight-UK following primary_deadline_date / secondary_deadline_date.
   primary_deadline: string | null;
   secondary_deadline: string | null;
+  primary_deadline_date: string | null;
+  secondary_deadline_date: string | null;
   primary_overdue_notified_at: string | null;
   primary_late_notified_at: string | null;
   secondary_overdue_notified_at: string | null;

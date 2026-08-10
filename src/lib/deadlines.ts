@@ -4,7 +4,7 @@ import {
   isSecondaryMarkingPhase,
   type ExamStatus,
 } from "@/lib/examStatus";
-import { formatDateTime } from "@/lib/datetime";
+import { endOfDeadlineDay, formatDateOnly } from "@/lib/datetime";
 
 // Number of working days after the deadline before status flips from
 // "overdue" to "late".
@@ -152,7 +152,9 @@ export function buildMarkerEmail(opts: {
   examName: string;
   examCode: string | null;
   role: "primary" | "secondary";
-  deadline: Date | null;
+  // Deadline is now a bare UK calendar date ('YYYY-MM-DD'). Overdue is
+  // any point past midnight UK following that date.
+  deadline: string | null;
   url: string;
   examId?: number;
 }): EmailToSend {
@@ -161,7 +163,7 @@ export function buildMarkerEmail(opts: {
     : opts.examName;
   const greeting = opts.markerName ? `Hi ${opts.markerName},` : "Hi,";
   const deadlineLine = opts.deadline
-    ? `Deadline: ${formatDateTime(opts.deadline)} (UK time)`
+    ? `Deadline: end of ${formatDateOnly(opts.deadline)} (UK time)`
     : "Deadline: not set";
   const roleLabel = opts.role === "primary" ? "primary" : "second";
 
@@ -263,7 +265,8 @@ export async function sweepDeadlineStatuses(opts: {
       await handlePhase({
         exam: e,
         phase: "primary",
-        deadline: e.primary_deadline ? new Date(e.primary_deadline) : null,
+        deadlineDate: e.primary_deadline_date,
+        deadline: endOfDeadlineDay(e.primary_deadline_date),
         markerId: e.primary_marker_id,
         token: e.primary_access_token,
         origin: opts.origin,
@@ -273,7 +276,8 @@ export async function sweepDeadlineStatuses(opts: {
       await handlePhase({
         exam: e,
         phase: "secondary",
-        deadline: e.secondary_deadline ? new Date(e.secondary_deadline) : null,
+        deadlineDate: e.secondary_deadline_date,
+        deadline: endOfDeadlineDay(e.secondary_deadline_date),
         markerId: e.secondary_marker_id,
         token: e.secondary_access_token,
         origin: opts.origin,
@@ -286,13 +290,23 @@ export async function sweepDeadlineStatuses(opts: {
 async function handlePhase(args: {
   exam: Exam;
   phase: "primary" | "secondary";
+  deadlineDate: string | null;
   deadline: Date | null;
   markerId: number | null;
   token: string | null;
   origin: string;
   now: Date;
 }): Promise<void> {
-  const { exam, phase, deadline, markerId, token, origin, now } = args;
+  const {
+    exam,
+    phase,
+    deadlineDate,
+    deadline,
+    markerId,
+    token,
+    origin,
+    now,
+  } = args;
   if (!deadline || !markerId) return; // No deadline set; never overdue.
   if (now.getTime() <= deadline.getTime()) return; // Still on time.
 
@@ -348,7 +362,7 @@ async function handlePhase(args: {
         examName: exam.name,
         examCode: exam.code,
         role: phase,
-        deadline,
+        deadline: deadlineDate,
         url,
         examId: exam.id,
       }),
@@ -368,7 +382,7 @@ async function handlePhase(args: {
         examName: exam.name,
         examCode: exam.code,
         role: phase,
-        deadline,
+        deadline: deadlineDate,
         url,
         examId: exam.id,
       }),

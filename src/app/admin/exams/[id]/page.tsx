@@ -31,7 +31,7 @@ import { ResetSeatsForm } from "./ResetSeatsForm";
 import { computeWeightedGrade } from "@/lib/weighted";
 import { McqUploadPanel } from "./McqUploadPanel";
 import { DeleteExamForm } from "./DeleteExamForm";
-import { formatDateTime, toDatetimeLocalValue } from "@/lib/datetime";
+import { formatDateOnly, formatDateTime } from "@/lib/datetime";
 
 export const dynamic = "force-dynamic";
 
@@ -213,7 +213,7 @@ export default async function AdminExamPage({
                 Second marker deadline
               </span>
               <input
-                type="datetime-local"
+                type="date"
                 name="secondary_deadline"
                 required
                 className="mt-1 rounded border px-2 py-1 text-sm"
@@ -275,9 +275,9 @@ export default async function AdminExamPage({
               className="mt-2 flex flex-wrap items-end gap-2"
             >
               <input
-                type="datetime-local"
+                type="date"
                 name="primary_deadline"
-                defaultValue={toDatetimeLocalValue(exam.primary_deadline)}
+                defaultValue={exam.primary_deadline_date ?? ""}
                 className="rounded border px-2 py-1 text-sm"
               />
               <button
@@ -287,13 +287,12 @@ export default async function AdminExamPage({
                 Save
               </button>
               <p className="basis-full text-xs text-slate-500">
-                Optional. Once set, the marker sees it on their screen and
-                overdue/late reminders fire automatically.
+                Deadline is end of that day, UK time.
               </p>
             </form>
-          ) : exam.primary_deadline ? (
+          ) : exam.primary_deadline_date ? (
             <p className="mt-1 font-medium">
-              {formatDateTime(exam.primary_deadline)}
+              End of {formatDateOnly(exam.primary_deadline_date)} (UK time)
             </p>
           ) : (
             <p className="mt-1 text-sm text-slate-400">Not set</p>
@@ -303,9 +302,9 @@ export default async function AdminExamPage({
           <p className="text-xs font-semibold uppercase text-slate-500">
             Second marker deadline
           </p>
-          {exam.secondary_deadline ? (
+          {exam.secondary_deadline_date ? (
             <p className="mt-1 font-medium">
-              {formatDateTime(exam.secondary_deadline)}
+              End of {formatDateOnly(exam.secondary_deadline_date)} (UK time)
             </p>
           ) : (
             <p className="mt-1 text-sm text-slate-400">
