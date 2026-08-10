@@ -233,7 +233,7 @@ export function CreateExamForm({
           className="mt-1 w-full rounded border px-3 py-2 text-sm"
         />
         <span className="mt-1 block text-xs text-slate-500">
-          Set to 23:00 UTC on this date.
+          Set to 23:00 UK time on this date.
         </span>
       </label>
       <label className="text-sm md:col-span-2">

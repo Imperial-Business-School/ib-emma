@@ -24,12 +24,11 @@ function parseDeadline(input: FormDataEntryValue | null): Date | null {
   const v = String(input ?? "").trim();
   if (!v) return null;
   // <input type="date"> sends "YYYY-MM-DD"; <input type="datetime-local">
-  // sends "YYYY-MM-DDTHH:MM". Both are interpreted as UK-local.
-  // Marker deadlines from a bare date default to 23:00 UTC.
-  if (/^\d{4}-\d{2}-\d{2}$/.test(v)) {
-    return new Date(`${v}T23:00:00.000Z`);
-  }
-  const d = parseUkLocalDateTime(v);
+  // sends "YYYY-MM-DDTHH:MM". Both are interpreted as UK-local so the
+  // display in Europe/London matches what the admin picked.
+  // Bare dates get the fixed cut-off time of 23:00 UK time.
+  const withTime = /^\d{4}-\d{2}-\d{2}$/.test(v) ? `${v}T23:00` : v;
+  const d = parseUkLocalDateTime(withTime);
   if (!d) throw new Error("Deadline is not a valid date/time");
   return d;
 }
