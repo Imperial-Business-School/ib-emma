@@ -136,6 +136,7 @@ export default async function AdminHome({
 
   return (
     <div className="space-y-8">
+      <p className="text-xs text-slate-500">Today: {formatDate(new Date())}</p>
       <section>
         <h1 className="text-2xl font-bold">Admin · Exams</h1>
         <p className="mt-1 text-sm text-slate-600">
