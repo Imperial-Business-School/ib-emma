@@ -53,7 +53,7 @@ export function ExamFilters({
     if (pageSize !== 25) params.set("pageSize", String(pageSize));
     const qs = params.toString();
     startTransition(() => {
-      router.replace(qs ? `/admin?${qs}` : "/admin");
+      router.replace(qs ? `/exams?${qs}` : "/exams");
     });
     // intentional: react to filter state only
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -1,19 +1,16 @@
 import Link from "next/link";
 import { headers } from "next/headers";
 import {
-  ACADEMIC_YEARS,
-  DEFAULT_ACADEMIC_YEAR,
   EXAM_STATUS_LABEL,
   query,
   queryOne,
-  type Exam,
   type ExamStatus,
 } from "@/lib/db";
 import { STATUS_BADGE_CLASS } from "@/lib/examStatus";
 import { sweepDeadlineStatuses } from "@/lib/deadlines";
-import { ExamFilters } from "./ExamFilters";
-import { CreateExamForm } from "./CreateExamForm";
-import { formatDate } from "@/lib/datetime";
+import { formatDate, formatDateOnly } from "@/lib/datetime";
+
+export const dynamic = "force-dynamic";
 
 async function getOrigin(): Promise<string> {
   const h = await headers();
@@ -22,229 +19,254 @@ async function getOrigin(): Promise<string> {
   return `${proto}://${host}`;
 }
 
-export const dynamic = "force-dynamic";
-
-type ExamRow = Exam & { total: number; graded: number; total_count: number };
-
-const PAGE_SIZE_DEFAULT = 25;
-
-type SortKey =
-  | "created_desc"
-  | "created_asc"
-  | "name_asc"
-  | "name_desc"
-  | "status_asc";
-
-const SORT_SQL: Record<SortKey, string> = {
-  created_desc: "e.created_at DESC",
-  created_asc: "e.created_at ASC",
-  name_asc: "lower(e.name) ASC",
-  name_desc: "lower(e.name) DESC",
-  status_asc: "e.status ASC, e.created_at DESC",
+type UpcomingRow = {
+  id: number;
+  name: string;
+  code: string | null;
+  deadline: string; // YYYY-MM-DD
+  marker_name: string | null;
+  role: "primary" | "secondary";
 };
 
-function parseSort(v: string | undefined): SortKey {
-  if (v && v in SORT_SQL) return v as SortKey;
-  return "created_desc";
+type OverdueRow = {
+  id: number;
+  name: string;
+  code: string | null;
+  status: ExamStatus;
+  deadline: string | null;
+  marker_name: string | null;
+};
+
+// Calendar-day difference between two 'YYYY-MM-DD' strings.
+function daysBetween(fromISO: string, toISO: string): number {
+  const from = new Date(`${fromISO}T00:00:00Z`);
+  const to = new Date(`${toISO}T00:00:00Z`);
+  return Math.floor((to.getTime() - from.getTime()) / 86400000);
 }
 
-function parseStatus(v: string | undefined): ExamStatus | null {
-  if (!v || v === "all") return null;
-  if (v in EXAM_STATUS_LABEL) return v as ExamStatus;
-  return null;
+function todayIsoDate(): string {
+  const fmt = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/London",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  // en-CA gives YYYY-MM-DD
+  return fmt.format(new Date());
 }
 
-function parseInt1(v: string | undefined, fallback: number): number {
-  const n = Number(v);
-  if (!Number.isFinite(n) || n < 1) return fallback;
-  return Math.floor(n);
-}
-
-export default async function AdminHome({
-  searchParams,
-}: {
-  searchParams: Promise<{
-    q?: string;
-    status?: string;
-    sort?: string;
-    page?: string;
-    pageSize?: string;
-  }>;
-}) {
+export default async function AdminDashboard() {
   await sweepDeadlineStatuses({ origin: await getOrigin() });
-  const programmes = await query<import("@/lib/db").Programme>(
-    "SELECT * FROM programmes ORDER BY lower(name)",
-  );
-  const sp = await searchParams;
-  const q = (sp.q ?? "").trim();
-  const status = parseStatus(sp.status);
-  const sort = parseSort(sp.sort);
-  const pageSize = Math.min(100, parseInt1(sp.pageSize, PAGE_SIZE_DEFAULT));
-  const page = parseInt1(sp.page, 1);
-  const offset = (page - 1) * pageSize;
-
-  // Build the WHERE clause and params for both the count and the list query.
-  const whereParts: string[] = [];
-  const whereParams: unknown[] = [];
-  if (q) {
-    whereParams.push(`%${q.toLowerCase()}%`);
-    whereParts.push(
-      `(lower(e.name) LIKE $${whereParams.length} OR lower(coalesce(e.code, '')) LIKE $${whereParams.length})`,
-    );
-  }
-  if (status) {
-    whereParams.push(status);
-    whereParts.push(`e.status = $${whereParams.length}`);
-  }
-  const whereSql = whereParts.length ? `WHERE ${whereParts.join(" AND ")}` : "";
+  const today = todayIsoDate();
 
   const totalRow = await queryOne<{ n: number }>(
-    `SELECT COUNT(*)::int AS n FROM exams e ${whereSql}`,
-    whereParams,
+    "SELECT COUNT(*)::int AS n FROM exams",
   );
-  const total = totalRow?.n ?? 0;
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  const safePage = Math.min(page, totalPages);
-  const safeOffset = (safePage - 1) * pageSize;
+  const examCount = totalRow?.n ?? 0;
 
-  const listParams = [...whereParams, pageSize, safeOffset];
-  const exams = await query<ExamRow>(
-    `SELECT e.*,
-            (SELECT COUNT(*) FROM submissions s WHERE s.exam_id = e.id)::int AS total,
-            (SELECT COUNT(*) FROM submissions s WHERE s.exam_id = e.id AND s.grade IS NOT NULL)::int AS graded
+  // 5 nearest upcoming primary or secondary deadlines whose exam is
+  // currently in the corresponding marking phase and hasn't passed.
+  const upcoming = await query<UpcomingRow>(
+    `SELECT e.id, e.name, e.code, e.primary_deadline_date AS deadline,
+            u.name AS marker_name, 'primary'::text AS role
      FROM exams e
-     ${whereSql}
-     ORDER BY ${SORT_SQL[sort]}
-     LIMIT $${listParams.length - 1} OFFSET $${listParams.length}`,
-    listParams,
+     LEFT JOIN users u ON u.id = e.primary_marker_id
+     WHERE e.status = 'primary_marking'
+       AND e.primary_deadline_date IS NOT NULL
+       AND e.primary_deadline_date >= $1::date
+     UNION ALL
+     SELECT e.id, e.name, e.code, e.secondary_deadline_date AS deadline,
+            u.name AS marker_name, 'secondary'::text AS role
+     FROM exams e
+     LEFT JOIN users u ON u.id = e.secondary_marker_id
+     WHERE e.status = 'secondary_marking'
+       AND e.secondary_deadline_date IS NOT NULL
+       AND e.secondary_deadline_date >= $1::date
+     ORDER BY deadline ASC
+     LIMIT 5`,
+    [today],
   );
 
-  // Build URLs that preserve filters when changing pages.
-  const buildHref = (overrides: Record<string, string | number | null>) => {
-    const params = new URLSearchParams();
-    if (q) params.set("q", q);
-    if (status) params.set("status", status);
-    if (sort !== "created_desc") params.set("sort", sort);
-    if (pageSize !== PAGE_SIZE_DEFAULT)
-      params.set("pageSize", String(pageSize));
-    if (safePage !== 1) params.set("page", String(safePage));
-    for (const [k, v] of Object.entries(overrides)) {
-      if (v == null || v === "") params.delete(k);
-      else params.set(k, String(v));
-    }
-    const s = params.toString();
-    return s ? `/admin?${s}` : "/admin";
-  };
+  const overdueCountRow = await queryOne<{ n: number }>(
+    `SELECT COUNT(*)::int AS n FROM exams
+     WHERE status IN ('first_marking_overdue','first_marking_late',
+                      'second_marking_overdue','second_marking_late')`,
+  );
+  const overdueCount = overdueCountRow?.n ?? 0;
 
-  const startRow = total === 0 ? 0 : safeOffset + 1;
-  const endRow = Math.min(safeOffset + pageSize, total);
+  const overdue = await query<OverdueRow>(
+    `SELECT e.id, e.name, e.code, e.status,
+            CASE
+              WHEN e.status IN ('first_marking_overdue','first_marking_late')
+                THEN e.primary_deadline_date::text
+              ELSE e.secondary_deadline_date::text
+            END AS deadline,
+            CASE
+              WHEN e.status IN ('first_marking_overdue','first_marking_late')
+                THEN p.name
+              ELSE s.name
+            END AS marker_name
+     FROM exams e
+     LEFT JOIN users p ON p.id = e.primary_marker_id
+     LEFT JOIN users s ON s.id = e.secondary_marker_id
+     WHERE e.status IN ('first_marking_overdue','first_marking_late',
+                        'second_marking_overdue','second_marking_late')
+     ORDER BY deadline ASC
+     LIMIT 3`,
+  );
 
   return (
     <div className="space-y-8">
-      <p className="text-xs text-slate-500">Today: {formatDate(new Date())}</p>
       <section>
-        <h1 className="text-2xl font-bold">Admin · Exams</h1>
+        <p className="text-xs text-slate-500">Today: {formatDate(new Date())}</p>
+        <h1 className="mt-1 text-2xl font-bold">Dashboard</h1>
         <p className="mt-1 text-sm text-slate-600">
-          Admin sees everything: seat numbers, CIDs, and grades from both markers.
+          Quick view of what needs attention.
         </p>
       </section>
 
-      <section className="rounded-lg border bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-semibold">Create exam</h2>
-        <p className="mt-1 text-sm text-slate-600">
-          Enter both markers and pick a sampling mode. The sampling mode is
-          locked once primary marking starts.
-        </p>
-        <CreateExamForm
-          programmes={programmes.map((p) => ({
-            id: p.id,
-            name: p.name,
-            programme_id: p.programme_id,
-            level: p.level,
-          }))}
-          academicYears={[...ACADEMIC_YEARS]}
-          defaultAcademicYear={DEFAULT_ACADEMIC_YEAR}
-        />
+      {/* Search + quick links */}
+      <section className="grid gap-4 md:grid-cols-[2fr_1fr]">
+        <div className="rounded-lg border bg-white p-4 shadow-sm">
+          <h2 className="text-sm font-semibold text-slate-700">Find an exam</h2>
+          <form action="/exams" method="get" className="mt-3 flex gap-2">
+            <input
+              name="q"
+              placeholder="Search by exam name or module code…"
+              className="flex-1 rounded border px-3 py-2 text-sm"
+            />
+            <button
+              type="submit"
+              className="rounded bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-700"
+            >
+              Search
+            </button>
+          </form>
+        </div>
+        <div className="rounded-lg border bg-white p-4 shadow-sm">
+          <h2 className="text-sm font-semibold text-slate-700">Quick links</h2>
+          <ul className="mt-3 space-y-1 text-sm">
+            <li>
+              <Link
+                href="/exams/create"
+                className="text-blue-600 hover:underline"
+              >
+                + Create new exam
+              </Link>
+            </li>
+            <li>
+              <Link href="/exams" className="text-blue-600 hover:underline">
+                All exams
+              </Link>
+            </li>
+            <li>
+              <Link
+                href="/admin/programmes"
+                className="text-blue-600 hover:underline"
+              >
+                Programmes
+              </Link>
+            </li>
+            <li>
+              <Link
+                href="/admin/admins"
+                className="text-blue-600 hover:underline"
+              >
+                Admin users
+              </Link>
+            </li>
+            <li>
+              <Link
+                href="/admin/emails"
+                className="text-blue-600 hover:underline"
+              >
+                Email log
+              </Link>
+            </li>
+          </ul>
+        </div>
       </section>
 
-      <ExamFilters
-        initialQ={q}
-        initialStatus={status ?? "all"}
-        initialSort={sort}
-        initialPageSize={pageSize}
-      />
+      {/* Stats row */}
+      <section className="grid gap-4 md:grid-cols-2">
+        <div className="rounded-lg border bg-white p-4 shadow-sm">
+          <p className="text-xs font-semibold uppercase text-slate-500">
+            Exams created
+          </p>
+          <p className="mt-2 text-3xl font-bold">{examCount}</p>
+          <Link
+            href="/exams"
+            className="mt-1 inline-block text-xs text-blue-600 hover:underline"
+          >
+            View all exams →
+          </Link>
+        </div>
+        <div className="rounded-lg border bg-white p-4 shadow-sm">
+          <p className="text-xs font-semibold uppercase text-slate-500">
+            Marking overdue
+          </p>
+          <p
+            className={`mt-2 text-3xl font-bold ${overdueCount > 0 ? "text-amber-700" : ""}`}
+          >
+            {overdueCount}
+          </p>
+          {overdueCount > 0 && (
+            <Link
+              href="/exams?status=first_marking_overdue"
+              className="mt-1 inline-block text-xs text-blue-600 hover:underline"
+            >
+              View overdue exams →
+            </Link>
+          )}
+        </div>
+      </section>
 
+      {/* Upcoming deadlines */}
       <section className="rounded-lg border bg-white shadow-sm">
-        <div className="flex items-center justify-between border-b px-4 py-2 text-xs text-slate-600">
-          <span>
-            {total === 0
-              ? "No exams match these filters."
-              : `Showing ${startRow}–${endRow} of ${total}`}
-          </span>
-          <span>
-            Page {safePage} of {totalPages}
-          </span>
+        <div className="border-b px-4 py-3">
+          <h2 className="text-lg font-semibold">Upcoming marking deadlines</h2>
+          <p className="text-xs text-slate-500">
+            The five earliest primary or secondary deadlines still in the future.
+          </p>
         </div>
         <table className="w-full text-sm">
           <thead className="border-b bg-slate-50 text-left text-slate-600">
             <tr>
-              <th className="px-4 py-2">
-                <SortLink
-                  current={sort}
-                  asc="name_asc"
-                  desc="name_desc"
-                  label="Name"
-                  href={(s) => buildHref({ sort: s, page: 1 })}
-                />
-              </th>
-              <th className="px-4 py-2">Code</th>
-              <th className="px-4 py-2">
-                <SortLink
-                  current={sort}
-                  asc="status_asc"
-                  label="Status"
-                  href={(s) => buildHref({ sort: s, page: 1 })}
-                />
-              </th>
-              <th className="px-4 py-2">Progress</th>
-              <th className="px-4 py-2">
-                <SortLink
-                  current={sort}
-                  asc="created_asc"
-                  desc="created_desc"
-                  label="Created"
-                  href={(s) => buildHref({ sort: s, page: 1 })}
-                />
-              </th>
+              <th className="px-4 py-2">Exam</th>
+              <th className="px-4 py-2">Role</th>
+              <th className="px-4 py-2">Marker</th>
+              <th className="px-4 py-2">Deadline</th>
               <th className="px-4 py-2" />
             </tr>
           </thead>
           <tbody>
-            {exams.length === 0 && (
+            {upcoming.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-slate-500">
-                  {total === 0 && (q || status)
-                    ? "No exams match these filters."
-                    : "No exams yet. Create one above."}
+                <td colSpan={5} className="px-4 py-8 text-center text-slate-500">
+                  No upcoming deadlines.
                 </td>
               </tr>
             )}
-            {exams.map((e) => (
-              <tr key={e.id} className="border-b last:border-b-0">
-                <td className="px-4 py-3 font-medium">{e.name}</td>
-                <td className="px-4 py-3 text-slate-600">{e.code ?? "—"}</td>
-                <td className="px-4 py-3">
-                  <StatusBadge status={e.status} />
+            {upcoming.map((r) => (
+              <tr key={`${r.id}-${r.role}`} className="border-b last:border-b-0">
+                <td className="px-4 py-3 font-medium">
+                  {r.name}
+                  {r.code && (
+                    <span className="ml-2 text-xs text-slate-500">
+                      {r.code}
+                    </span>
+                  )}
                 </td>
-                <td className="px-4 py-3 text-slate-600">
-                  {e.graded} / {e.total} primary
+                <td className="px-4 py-3 text-slate-600 capitalize">{r.role}</td>
+                <td className="px-4 py-3 text-slate-700">
+                  {r.marker_name ?? "—"}
                 </td>
-                <td className="px-4 py-3 text-slate-600">
-                  {formatDate(e.created_at)}
+                <td className="px-4 py-3 text-slate-700">
+                  {formatDateOnly(r.deadline)}
                 </td>
                 <td className="px-4 py-3 text-right">
                   <Link
-                    href={`/admin/exams/${e.id}`}
+                    href={`/admin/exams/${r.id}`}
                     className="text-blue-600 hover:underline"
                   >
                     Manage →
@@ -254,71 +276,74 @@ export default async function AdminHome({
             ))}
           </tbody>
         </table>
-        <div className="flex items-center justify-between border-t px-4 py-3 text-sm">
-          <Link
-            href={buildHref({ page: safePage - 1 })}
-            aria-disabled={safePage <= 1}
-            className={`rounded border px-3 py-1.5 ${
-              safePage <= 1
-                ? "pointer-events-none border-slate-200 text-slate-300"
-                : "bg-white hover:bg-slate-50"
-            }`}
-          >
-            ← Previous
-          </Link>
-          <span className="text-xs text-slate-600">
-            Page {safePage} of {totalPages}
-          </span>
-          <Link
-            href={buildHref({ page: safePage + 1 })}
-            aria-disabled={safePage >= totalPages}
-            className={`rounded border px-3 py-1.5 ${
-              safePage >= totalPages
-                ? "pointer-events-none border-slate-200 text-slate-300"
-                : "bg-white hover:bg-slate-50"
-            }`}
-          >
-            Next →
-          </Link>
-        </div>
       </section>
+
+      {/* Longest overdue */}
+      {overdueCount > 0 && (
+        <section className="rounded-lg border bg-white shadow-sm">
+          <div className="border-b px-4 py-3">
+            <h2 className="text-lg font-semibold">Longest overdue marking</h2>
+            <p className="text-xs text-slate-500">
+              The three exams whose marking has been overdue longest.
+            </p>
+          </div>
+          <table className="w-full text-sm">
+            <thead className="border-b bg-slate-50 text-left text-slate-600">
+              <tr>
+                <th className="px-4 py-2">Exam</th>
+                <th className="px-4 py-2">Status</th>
+                <th className="px-4 py-2">Marker</th>
+                <th className="px-4 py-2">Deadline</th>
+                <th className="px-4 py-2">Days overdue</th>
+                <th className="px-4 py-2" />
+              </tr>
+            </thead>
+            <tbody>
+              {overdue.map((r) => {
+                const days = r.deadline ? daysBetween(r.deadline, today) : null;
+                return (
+                  <tr key={r.id} className="border-b last:border-b-0">
+                    <td className="px-4 py-3 font-medium">
+                      {r.name}
+                      {r.code && (
+                        <span className="ml-2 text-xs text-slate-500">
+                          {r.code}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={`rounded px-2 py-0.5 text-xs font-medium ${STATUS_BADGE_CLASS[r.status]}`}
+                      >
+                        {EXAM_STATUS_LABEL[r.status]}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-slate-700">
+                      {r.marker_name ?? "—"}
+                    </td>
+                    <td className="px-4 py-3 text-slate-700">
+                      {r.deadline ? formatDateOnly(r.deadline) : "—"}
+                    </td>
+                    <td className="px-4 py-3 text-slate-700">
+                      {days != null
+                        ? `${days} day${days === 1 ? "" : "s"}`
+                        : "—"}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <Link
+                        href={`/admin/exams/${r.id}`}
+                        className="text-blue-600 hover:underline"
+                      >
+                        Manage →
+                      </Link>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </section>
+      )}
     </div>
-  );
-}
-
-function SortLink({
-  current,
-  asc,
-  desc,
-  label,
-  href,
-}: {
-  current: SortKey;
-  asc: SortKey;
-  desc?: SortKey;
-  label: string;
-  href: (sort: SortKey) => string;
-}) {
-  // Toggle between asc and (if provided) desc when the column is already
-  // active. Otherwise default to asc.
-  const next: SortKey =
-    current === asc && desc ? desc : current === desc ? asc : asc;
-  const arrow =
-    current === asc ? " ↑" : desc && current === desc ? " ↓" : "";
-  return (
-    <Link href={href(next)} className="hover:text-slate-900">
-      {label}
-      <span className="text-slate-400">{arrow}</span>
-    </Link>
-  );
-}
-
-function StatusBadge({ status }: { status: ExamStatus }) {
-  return (
-    <span
-      className={`rounded px-2 py-0.5 text-xs font-medium ${STATUS_BADGE_CLASS[status]}`}
-    >
-      {EXAM_STATUS_LABEL[status]}
-    </span>
   );
 }

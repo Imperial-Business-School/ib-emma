@@ -1,6 +1,6 @@
 import AdminChrome from "../AdminChrome";
 
-export default function AdminLayout({
+export default function ExamsLayout({
   children,
 }: {
   children: React.ReactNode;
