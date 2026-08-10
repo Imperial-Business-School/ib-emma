@@ -48,10 +48,16 @@ export async function saveGradesByTokenAction(
   const { exam, role } = await authorize(examId, token);
   const isPrimary = role === "primary";
 
+  // If an admin identity cookie is present, treat this as an override
+  // save: bypass phase gating and stamp an override note on each row.
+  const { getActingAdmin } = await import("@/lib/actor");
+  const actingAdmin = await getActingAdmin();
+  const isAdminOverride = actingAdmin != null;
+
   // Marker phase write OR primary marker resolving review discrepancies.
   const inMarkingPhase = isInMarkerPhase(role, exam.status);
   const inResolutionPhase = isPrimary && exam.status === "review";
-  if (!inMarkingPhase && !inResolutionPhase) {
+  if (!isAdminOverride && !inMarkingPhase && !inResolutionPhase) {
     throw new Error("Marking is not currently open for you on this exam");
   }
 
@@ -99,8 +105,12 @@ export async function saveGradesByTokenAction(
       }
     }
     // Secondary marker giving a grade that doesn't match the primary's must
-    // provide a comment.
-    if (role === "secondary" && !inResolutionPhase) {
+    // provide a comment. Admin override skips this check.
+    if (
+      role === "secondary" &&
+      !inResolutionPhase &&
+      !isAdminOverride
+    ) {
       const newGrade = u.grade.trim();
       const primaryGrade = row.grade;
       if (
@@ -181,6 +191,22 @@ export async function saveGradesByTokenAction(
         );
         results.push({ id, saved_at: r?.secondary_graded_at ?? null });
       }
+    }
+  }
+
+  // Stamp an override note on every affected row when an admin was
+  // acting. The note surfaces on the audit CSV so we retain the who and
+  // when even after the value is later overwritten by a marker.
+  if (isAdminOverride && actingAdmin && filteredUpdates.length > 0) {
+    const ts = new Date().toISOString();
+    const note = `Grade was changed by Admin user ${actingAdmin.name} on ${ts} (via marker page ${role})`;
+    for (const { id } of filteredUpdates) {
+      await query(
+        `UPDATE submissions
+         SET override_note = COALESCE(override_note || E'\\n', '') || $1
+         WHERE id = $2`,
+        [note, id],
+      );
     }
   }
 

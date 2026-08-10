@@ -13,6 +13,7 @@ import { STATUS_BADGE_CLASS } from "@/lib/examStatus";
 import { sweepDeadlineStatuses } from "@/lib/deadlines";
 import {
   addSeatAction,
+  adminOverrideGradeAction,
   deleteSeatAction,
   reassignMarkerAction,
   regenerateMarkerTokenAction,
@@ -41,14 +42,55 @@ async function getOrigin(): Promise<string> {
   return `${proto}://${host}`;
 }
 
+type SeatSortKey =
+  | "seat_asc"
+  | "seat_desc"
+  | "cid_asc"
+  | "cid_desc"
+  | "mcq_asc"
+  | "mcq_desc"
+  | "grade_asc"
+  | "grade_desc"
+  | "secondary_asc"
+  | "secondary_desc"
+  | "final_asc"
+  | "final_desc";
+
+const SEAT_SORT_SQL: Record<SeatSortKey, string> = {
+  seat_asc: "length(seat_number), seat_number",
+  seat_desc: "length(seat_number) DESC, seat_number DESC",
+  cid_asc: "cid",
+  cid_desc: "cid DESC",
+  mcq_asc: "NULLIF(mcq_score, '')::float NULLS LAST, seat_number",
+  mcq_desc: "NULLIF(mcq_score, '')::float DESC NULLS LAST, seat_number",
+  grade_asc: "NULLIF(grade, '')::float NULLS LAST, seat_number",
+  grade_desc: "NULLIF(grade, '')::float DESC NULLS LAST, seat_number",
+  secondary_asc:
+    "NULLIF(secondary_grade, '')::float NULLS LAST, seat_number",
+  secondary_desc:
+    "NULLIF(secondary_grade, '')::float DESC NULLS LAST, seat_number",
+  final_asc: "NULLIF(final_grade, '')::float NULLS LAST, seat_number",
+  final_desc:
+    "NULLIF(final_grade, '')::float DESC NULLS LAST, seat_number",
+};
+
+function parseSeatSort(v: string | undefined): SeatSortKey {
+  if (v && v in SEAT_SORT_SQL) return v as SeatSortKey;
+  return "seat_asc";
+}
+
 export default async function AdminExamPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ sort?: string }>;
 }) {
   const { id } = await params;
+  const sp = await searchParams;
   const examId = Number(id);
   if (!Number.isFinite(examId)) notFound();
+  const seatSort = parseSeatSort(sp.sort);
 
   const origin = await getOrigin();
   await sweepDeadlineStatuses({ origin, examId });
@@ -65,7 +107,7 @@ export default async function AdminExamPage({
     : null;
 
   const submissions = await query<Submission>(
-    "SELECT * FROM submissions WHERE exam_id = $1 ORDER BY length(seat_number), seat_number",
+    `SELECT * FROM submissions WHERE exam_id = $1 ORDER BY ${SEAT_SORT_SQL[seatSort]}`,
     [examId],
   );
   const programme = exam.programme_id
@@ -426,18 +468,68 @@ export default async function AdminExamPage({
         <table className="w-full text-sm">
           <thead className="border-b bg-slate-50 text-left text-slate-600">
             <tr>
-              <th className="px-4 py-2">CID</th>
-              <th className="px-4 py-2">Seat</th>
+              <th className="px-4 py-2">
+                <SeatSortHeader
+                  label="CID"
+                  asc="cid_asc"
+                  desc="cid_desc"
+                  current={seatSort}
+                  buildHref={(s) => `/admin/exams/${exam.id}?sort=${s}`}
+                />
+              </th>
+              <th className="px-4 py-2">
+                <SeatSortHeader
+                  label="Seat"
+                  asc="seat_asc"
+                  desc="seat_desc"
+                  current={seatSort}
+                  buildHref={(s) => `/admin/exams/${exam.id}?sort=${s}`}
+                />
+              </th>
               <th className="px-4 py-2 text-center">Absent</th>
               {exam.mcq_enabled && (
-                <th className="px-4 py-2">MCQ score</th>
+                <th className="px-4 py-2">
+                  <SeatSortHeader
+                    label="MCQ score"
+                    asc="mcq_asc"
+                    desc="mcq_desc"
+                    current={seatSort}
+                    buildHref={(s) => `/admin/exams/${exam.id}?sort=${s}`}
+                  />
+                </th>
               )}
-              <th className="px-4 py-2">Primary grade</th>
+              <th className="px-4 py-2">
+                <SeatSortHeader
+                  label="Primary grade"
+                  asc="grade_asc"
+                  desc="grade_desc"
+                  current={seatSort}
+                  buildHref={(s) => `/admin/exams/${exam.id}?sort=${s}`}
+                />
+              </th>
               <th className="px-4 py-2">Comment</th>
               <th className="px-4 py-2 text-center">Sample</th>
-              <th className="px-4 py-2">Secondary grade</th>
+              <th className="px-4 py-2">
+                <SeatSortHeader
+                  label="Secondary grade"
+                  asc="secondary_asc"
+                  desc="secondary_desc"
+                  current={seatSort}
+                  buildHref={(s) => `/admin/exams/${exam.id}?sort=${s}`}
+                />
+              </th>
               <th className="px-4 py-2">Comment</th>
-              {showFinalColumn && <th className="px-4 py-2">Final grade</th>}
+              {showFinalColumn && (
+                <th className="px-4 py-2">
+                  <SeatSortHeader
+                    label="Final grade"
+                    asc="final_asc"
+                    desc="final_desc"
+                    current={seatSort}
+                    buildHref={(s) => `/admin/exams/${exam.id}?sort=${s}`}
+                  />
+                </th>
+              )}
               {showFinalColumn && exam.mcq_enabled && (
                 <th className="px-4 py-2">Weighted grade</th>
               )}
@@ -544,7 +636,37 @@ export default async function AdminExamPage({
                     {s.absent ? (
                       <span className="text-slate-400">—</span>
                     ) : (
-                      (s.grade ?? <span className="text-slate-400">—</span>)
+                      <form
+                        action={async (fd) => {
+                          "use server";
+                          await adminOverrideGradeAction(
+                            exam.id,
+                            s.id,
+                            "grade",
+                            fd,
+                          );
+                        }}
+                        className="flex gap-1"
+                        title={
+                          s.override_note ??
+                          "Admin override — type a new grade and save"
+                        }
+                      >
+                        <input
+                          name="value"
+                          defaultValue={s.grade ?? ""}
+                          placeholder="—"
+                          pattern="^\d+(\.\d{1,2})?$"
+                          inputMode="decimal"
+                          className="w-20 rounded border px-2 py-1 text-sm"
+                        />
+                        <button
+                          type="submit"
+                          className="rounded border bg-white px-2 py-1 text-xs hover:bg-slate-50"
+                        >
+                          Save
+                        </button>
+                      </form>
                     )}
                   </td>
                   <td className="px-4 py-2 text-slate-700">
@@ -582,12 +704,40 @@ export default async function AdminExamPage({
                     )}
                   </td>
                   <td className="px-4 py-2">
-                    {s.in_sample ? (
-                      (s.secondary_grade ?? (
-                        <span className="text-slate-400">—</span>
-                      ))
+                    {s.absent ? (
+                      <span className="text-slate-400">—</span>
                     ) : (
-                      <span className="text-slate-300">n/a</span>
+                      <form
+                        action={async (fd) => {
+                          "use server";
+                          await adminOverrideGradeAction(
+                            exam.id,
+                            s.id,
+                            "secondary_grade",
+                            fd,
+                          );
+                        }}
+                        className="flex gap-1"
+                        title={
+                          s.override_note ??
+                          "Admin override — type a new grade and save"
+                        }
+                      >
+                        <input
+                          name="value"
+                          defaultValue={s.secondary_grade ?? ""}
+                          placeholder="—"
+                          pattern="^\d+(\.\d{1,2})?$"
+                          inputMode="decimal"
+                          className="w-20 rounded border px-2 py-1 text-sm"
+                        />
+                        <button
+                          type="submit"
+                          className="rounded border bg-white px-2 py-1 text-xs hover:bg-slate-50"
+                        >
+                          Save
+                        </button>
+                      </form>
                     )}
                   </td>
                   <td className="px-4 py-2 text-slate-700">
@@ -601,16 +751,42 @@ export default async function AdminExamPage({
                   </td>
                   {showFinalColumn && (
                     <td className="px-4 py-2">
-                      {needsResolution ? (
-                        <span className="text-xs text-amber-900">
-                          awaiting primary
-                        </span>
+                      {s.absent ? (
+                        <span className="text-slate-400">—</span>
                       ) : (
-                        <span className="font-medium">
-                          {s.final_grade ?? (
-                            <span className="text-slate-400">—</span>
-                          )}
-                        </span>
+                        <form
+                          action={async (fd) => {
+                            "use server";
+                            await adminOverrideGradeAction(
+                              exam.id,
+                              s.id,
+                              "final_grade",
+                              fd,
+                            );
+                          }}
+                          className="flex gap-1"
+                          title={
+                            needsResolution
+                              ? "Awaiting primary marker resolution — admin can also enter a final grade here"
+                              : (s.override_note ??
+                                "Admin override — type a new grade and save")
+                          }
+                        >
+                          <input
+                            name="value"
+                            defaultValue={s.final_grade ?? ""}
+                            placeholder={needsResolution ? "resolve" : "—"}
+                            pattern="^\d+(\.\d{1,2})?$"
+                            inputMode="decimal"
+                            className={`w-20 rounded border px-2 py-1 text-sm ${needsResolution ? "border-amber-400" : ""}`}
+                          />
+                          <button
+                            type="submit"
+                            className="rounded border bg-white px-2 py-1 text-xs hover:bg-slate-50"
+                          >
+                            Save
+                          </button>
+                        </form>
                       )}
                     </td>
                   )}
@@ -804,5 +980,30 @@ function StatusBadge({ status }: { status: Exam["status"] }) {
     >
       {EXAM_STATUS_LABEL[status]}
     </span>
+  );
+}
+
+function SeatSortHeader({
+  label,
+  asc,
+  desc,
+  current,
+  buildHref,
+}: {
+  label: string;
+  asc: SeatSortKey;
+  desc: SeatSortKey;
+  current: SeatSortKey;
+  buildHref: (sort: SeatSortKey) => string;
+}) {
+  const next: SeatSortKey =
+    current === asc ? desc : desc && current === desc ? asc : asc;
+  const arrow =
+    current === asc ? " ↑" : current === desc ? " ↓" : "";
+  return (
+    <Link href={buildHref(next)} className="hover:text-slate-900">
+      {label}
+      <span className="text-slate-400">{arrow || " ↕"}</span>
+    </Link>
   );
 }
