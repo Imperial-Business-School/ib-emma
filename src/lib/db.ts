@@ -1,5 +1,10 @@
-import { Pool, type QueryResultRow } from "pg";
+import pg, { Pool, type QueryResultRow } from "pg";
 import crypto from "node:crypto";
+
+// Return Postgres DATE columns as raw 'YYYY-MM-DD' strings. Default is a
+// JS Date at local midnight, which is timezone-dangerous for a bare date.
+// OID 1082 = DATE.
+pg.types.setTypeParser(1082, (v) => v);
 
 declare global {
   // eslint-disable-next-line no-var
