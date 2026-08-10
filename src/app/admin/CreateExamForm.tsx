@@ -100,7 +100,7 @@ export function CreateExamForm({
           ))}
         </select>
       </label>
-      <label className="text-sm">
+      <label className="text-sm md:col-span-2">
         <span className="block text-xs font-medium text-slate-600">
           Academic year
         </span>
@@ -115,20 +115,6 @@ export function CreateExamForm({
             </option>
           ))}
         </select>
-      </label>
-      <label className="text-sm">
-        <span className="block text-xs font-medium text-slate-600">
-          Primary marker deadline
-        </span>
-        <input
-          type="date"
-          name="primary_deadline"
-          required
-          className="mt-1 w-full rounded border px-3 py-2 text-sm"
-        />
-        <span className="mt-1 block text-xs text-slate-500">
-          Set to 23:00 UTC on this date.
-        </span>
       </label>
       <fieldset className="rounded border bg-slate-50 p-3 md:col-span-2">
         <legend className="px-1 text-xs font-semibold uppercase text-slate-500">
@@ -236,6 +222,20 @@ export function CreateExamForm({
           </p>
         )}
       </div>
+      <label className="text-sm md:col-span-2">
+        <span className="block text-xs font-medium text-slate-600">
+          Primary marker deadline
+        </span>
+        <input
+          type="date"
+          name="primary_deadline"
+          required
+          className="mt-1 w-full rounded border px-3 py-2 text-sm"
+        />
+        <span className="mt-1 block text-xs text-slate-500">
+          Set to 23:00 UTC on this date.
+        </span>
+      </label>
       <label className="text-sm md:col-span-2">
         <span className="block text-xs font-medium text-slate-600">
           Second marker deadline (optional; can be set at 'Start second marking' instead)
