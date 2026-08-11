@@ -469,18 +469,18 @@ export default async function AdminExamPage({
             <tr>
               <th className="px-4 py-2">
                 <SeatSortHeader
-                  label="CID"
-                  asc="cid_asc"
-                  desc="cid_desc"
+                  label="Seat"
+                  asc="seat_asc"
+                  desc="seat_desc"
                   current={seatSort}
                   buildHref={(s) => `/admin/exams/${exam.id}?sort=${s}`}
                 />
               </th>
               <th className="px-4 py-2">
                 <SeatSortHeader
-                  label="Seat"
-                  asc="seat_asc"
-                  desc="seat_desc"
+                  label="CID"
+                  asc="cid_asc"
+                  desc="cid_desc"
                   current={seatSort}
                   buildHref={(s) => `/admin/exams/${exam.id}?sort=${s}`}
                 />
@@ -569,8 +569,8 @@ export default async function AdminExamPage({
                   key={s.id}
                   className={`border-b last:border-b-0 align-top ${rowClass}`}
                 >
-                  <td className="px-4 py-2 font-mono">{s.cid}</td>
                   <td className="px-4 py-2 font-mono">{s.seat_number}</td>
+                  <td className="px-4 py-2 font-mono">{s.cid}</td>
                   <td className="px-4 py-2 text-center">
                     <form
                       action={async () => {

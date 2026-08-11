@@ -67,8 +67,8 @@ export async function GET(
   ];
 
   const header = [
-    "CID",
     "Seat",
+    "CID",
     "Absent",
     "In sample",
     "Primary grade",
@@ -96,8 +96,8 @@ export async function GET(
           exam.mcq_enabled,
         );
     rows.push([
-      s.cid,
       s.seat_number,
+      s.cid,
       s.absent ? "Yes" : "No",
       s.in_sample ? "Yes" : "No",
       s.grade,
