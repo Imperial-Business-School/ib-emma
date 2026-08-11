@@ -29,9 +29,12 @@ type SortKey =
   | "saved";
 type SortDir = "asc" | "desc";
 
+const naturalSeatCollator = new Intl.Collator(undefined, {
+  numeric: true,
+  sensitivity: "base",
+});
 function naturalCompareSeat(a: string, b: string): number {
-  if (a.length !== b.length) return a.length - b.length;
-  return a.localeCompare(b);
+  return naturalSeatCollator.compare(a, b);
 }
 function numericCompare(a: string | null | undefined, b: string | null | undefined): number {
   const aN = a == null ? NaN : Number(a);

@@ -1,6 +1,7 @@
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { query, queryOne, type Exam, type Submission } from "@/lib/db";
+import { SEAT_ORDER_ASC } from "@/lib/seatSort";
 import {
   isPrimaryMarkingPhase,
   isSecondaryMarkingPhase,
@@ -65,7 +66,7 @@ export default async function MarkerByTokenPage({
          WHERE exam_id = $1
            AND in_sample = true
            AND grade IS DISTINCT FROM secondary_grade
-         ORDER BY length(seat_number), seat_number`,
+         ORDER BY ${SEAT_ORDER_ASC}`,
         [examId],
       )
     : isSecondary
@@ -76,16 +77,16 @@ export default async function MarkerByTokenPage({
           exam.sampling_mode === "full"
             ? `SELECT * FROM submissions
                WHERE exam_id = $1
-               ORDER BY length(seat_number), seat_number`
+               ORDER BY ${SEAT_ORDER_ASC}`
             : `SELECT * FROM submissions
                WHERE exam_id = $1 AND in_sample = true
-               ORDER BY length(seat_number), seat_number`,
+               ORDER BY ${SEAT_ORDER_ASC}`,
           [examId],
         )
       : await query<Submission>(
           `SELECT * FROM submissions
            WHERE exam_id = $1
-           ORDER BY length(seat_number), seat_number`,
+           ORDER BY ${SEAT_ORDER_ASC}`,
           [examId],
         );
 

@@ -9,6 +9,7 @@ import {
 } from "@/lib/db";
 import { toCsv } from "@/lib/csv";
 import { computeWeightedGrade } from "@/lib/weighted";
+import { SEAT_ORDER_ASC } from "@/lib/seatSort";
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +29,7 @@ export async function GET(
   if (!exam) return new NextResponse("Exam not found", { status: 404 });
 
   const submissions = await query<Submission>(
-    "SELECT * FROM submissions WHERE exam_id = $1 ORDER BY length(seat_number), seat_number",
+    `SELECT * FROM submissions WHERE exam_id = $1 ORDER BY ${SEAT_ORDER_ASC}`,
     [examId],
   );
 

@@ -29,6 +29,7 @@ import {
 } from "../../actions";
 import { ResetSeatsForm } from "./ResetSeatsForm";
 import { computeWeightedGrade } from "@/lib/weighted";
+import { SEAT_ORDER_ASC, SEAT_ORDER_DESC } from "@/lib/seatSort";
 import { McqUploadPanel } from "./McqUploadPanel";
 import { DeleteExamForm } from "./DeleteExamForm";
 import { formatDateOnly, formatDateTime } from "@/lib/datetime";
@@ -57,8 +58,8 @@ type SeatSortKey =
   | "final_desc";
 
 const SEAT_SORT_SQL: Record<SeatSortKey, string> = {
-  seat_asc: "length(seat_number), seat_number",
-  seat_desc: "length(seat_number) DESC, seat_number DESC",
+  seat_asc: SEAT_ORDER_ASC,
+  seat_desc: SEAT_ORDER_DESC,
   cid_asc: "cid",
   cid_desc: "cid DESC",
   mcq_asc: "NULLIF(mcq_score, '')::float NULLS LAST, seat_number",
