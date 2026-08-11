@@ -213,6 +213,35 @@ async function initSchema(): Promise<void> {
   await pool.query(`
     CREATE UNIQUE INDEX IF NOT EXISTS idx_exams_primary_token ON exams(primary_access_token);
     CREATE UNIQUE INDEX IF NOT EXISTS idx_exams_secondary_token ON exams(secondary_access_token);
+
+    -- Ledger for one-shot data migrations.
+    CREATE TABLE IF NOT EXISTS _data_migrations (
+      id TEXT PRIMARY KEY,
+      applied_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+
+    -- One-off: on exam 12 the seat_number and cid columns were uploaded
+    -- swapped. Swap them back exactly once. Uses a two-step update with
+    -- a temporary suffix so the (exam_id, seat_number) UNIQUE index
+    -- can't be violated during the transition.
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM _data_migrations WHERE id = 'swap_seat_cid_exam_12'
+      ) AND EXISTS (SELECT 1 FROM exams WHERE id = 12) THEN
+        UPDATE submissions
+        SET seat_number = seat_number || '__swap'
+        WHERE exam_id = 12;
+
+        UPDATE submissions
+        SET seat_number = cid,
+            cid = REPLACE(seat_number, '__swap', '')
+        WHERE exam_id = 12;
+
+        INSERT INTO _data_migrations (id)
+        VALUES ('swap_seat_cid_exam_12');
+      END IF;
+    END $$;
   `);
 }
 
