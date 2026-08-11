@@ -242,6 +242,26 @@ async function initSchema(): Promise<void> {
         VALUES ('swap_seat_cid_exam_12');
       END IF;
     END $$;
+
+    -- One-off: purge every exam whose UK-local created_at date is not
+    -- 2026-08-10. Related submissions and exam_markers rows are removed
+    -- via the ON DELETE CASCADE on those tables' foreign keys; email_log
+    -- entries have exam_id nulled (ON DELETE SET NULL) so the audit
+    -- record of past reminders is retained.
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM _data_migrations
+        WHERE id = 'purge_exams_except_10aug2026'
+      ) THEN
+        DELETE FROM exams
+        WHERE (created_at AT TIME ZONE 'Europe/London')::date
+              <> DATE '2026-08-10';
+
+        INSERT INTO _data_migrations (id)
+        VALUES ('purge_exams_except_10aug2026');
+      END IF;
+    END $$;
   `);
 }
 
