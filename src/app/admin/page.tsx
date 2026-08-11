@@ -87,12 +87,20 @@ export default async function AdminDashboard() {
     [today],
   );
 
-  const overdueCountRow = await queryOne<{ n: number }>(
-    `SELECT COUNT(*)::int AS n FROM exams
+  const overdueByStatus = await query<{ status: ExamStatus; n: number }>(
+    `SELECT status, COUNT(*)::int AS n
+     FROM exams
      WHERE status IN ('first_marking_overdue','first_marking_late',
-                      'second_marking_overdue','second_marking_late')`,
+                      'second_marking_overdue','second_marking_late')
+     GROUP BY status`,
   );
-  const overdueCount = overdueCountRow?.n ?? 0;
+  const countByStatus: Record<string, number> = {};
+  for (const row of overdueByStatus) countByStatus[row.status] = row.n;
+  const overdueCount =
+    (countByStatus.first_marking_overdue ?? 0) +
+    (countByStatus.first_marking_late ?? 0) +
+    (countByStatus.second_marking_overdue ?? 0) +
+    (countByStatus.second_marking_late ?? 0);
 
   const overdue = await query<OverdueRow>(
     `SELECT e.id, e.name, e.code, e.status,
@@ -203,21 +211,34 @@ export default async function AdminDashboard() {
         </div>
         <div className="rounded-lg border bg-white p-4 shadow-sm">
           <p className="text-xs font-semibold uppercase text-slate-500">
-            Marking overdue
+            Marking Overdue or Late
           </p>
-          <p
-            className={`mt-2 text-3xl font-bold ${overdueCount > 0 ? "text-amber-700" : ""}`}
-          >
-            {overdueCount}
-          </p>
-          {overdueCount > 0 && (
-            <Link
-              href="/exams?status=first_marking_overdue"
-              className="mt-1 inline-block text-xs text-blue-600 hover:underline"
-            >
-              View overdue exams →
-            </Link>
-          )}
+          <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
+            <OverdueLink
+              label="First marking overdue"
+              count={countByStatus.first_marking_overdue ?? 0}
+              status="first_marking_overdue"
+              accent="amber"
+            />
+            <OverdueLink
+              label="First marking late"
+              count={countByStatus.first_marking_late ?? 0}
+              status="first_marking_late"
+              accent="red"
+            />
+            <OverdueLink
+              label="Second marking overdue"
+              count={countByStatus.second_marking_overdue ?? 0}
+              status="second_marking_overdue"
+              accent="amber"
+            />
+            <OverdueLink
+              label="Second marking late"
+              count={countByStatus.second_marking_late ?? 0}
+              status="second_marking_late"
+              accent="red"
+            />
+          </div>
         </div>
       </section>
 
@@ -345,5 +366,41 @@ export default async function AdminDashboard() {
         </section>
       )}
     </div>
+  );
+}
+
+function OverdueLink({
+  label,
+  count,
+  status,
+  accent,
+}: {
+  label: string;
+  count: number;
+  status: string;
+  accent: "amber" | "red";
+}) {
+  const active = count > 0;
+  const tone = active
+    ? accent === "red"
+      ? "text-red-700"
+      : "text-amber-700"
+    : "text-slate-400";
+  const content = (
+    <div
+      className={`rounded border ${active ? "bg-white hover:bg-slate-50" : "bg-slate-50"} px-3 py-2`}
+    >
+      <p className="text-[10px] font-medium uppercase tracking-wide text-slate-500">
+        {label}
+      </p>
+      <p className={`mt-1 text-2xl font-bold ${tone}`}>{count}</p>
+    </div>
+  );
+  return active ? (
+    <Link href={`/exams?status=${status}`} className="block">
+      {content}
+    </Link>
+  ) : (
+    content
   );
 }
