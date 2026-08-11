@@ -29,7 +29,12 @@ import {
 import { AbsenceToggleButton } from "./AbsenceToggleButton";
 import { ResetSeatsForm } from "./ResetSeatsForm";
 import { computeWeightedGrade } from "@/lib/weighted";
-import { SEAT_ORDER_ASC, SEAT_ORDER_DESC } from "@/lib/seatSort";
+import {
+  CID_ORDER_ASC,
+  CID_ORDER_DESC,
+  SEAT_ORDER_ASC,
+  SEAT_ORDER_DESC,
+} from "@/lib/seatSort";
 import { McqUploadPanel } from "./McqUploadPanel";
 import { DeleteExamForm } from "./DeleteExamForm";
 import { formatDateOnly, formatDateTime } from "@/lib/datetime";
@@ -60,8 +65,8 @@ type SeatSortKey =
 const SEAT_SORT_SQL: Record<SeatSortKey, string> = {
   seat_asc: SEAT_ORDER_ASC,
   seat_desc: SEAT_ORDER_DESC,
-  cid_asc: "cid",
-  cid_desc: "cid DESC",
+  cid_asc: CID_ORDER_ASC,
+  cid_desc: CID_ORDER_DESC,
   mcq_asc: "NULLIF(mcq_score, '')::float NULLS LAST, seat_number",
   mcq_desc: "NULLIF(mcq_score, '')::float DESC NULLS LAST, seat_number",
   grade_asc: "NULLIF(grade, '')::float NULLS LAST, seat_number",
