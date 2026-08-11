@@ -239,6 +239,13 @@ export default async function AdminDashboard() {
               accent="red"
             />
           </div>
+          <p className="mt-3 text-xs text-slate-500">
+            <span className="font-medium">Overdue</span> = 0–4 working days
+            beyond deadline
+            <br />
+            <span className="font-medium">Late</span> = 5+ working days beyond
+            deadline
+          </p>
         </div>
       </section>
 
