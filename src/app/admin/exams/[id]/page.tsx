@@ -21,12 +21,12 @@ import {
   setMcqScoreAction,
   startPrimaryMarkingAction,
   startSecondaryMarkingAction,
-  toggleAbsentAction,
   toggleInSampleAction,
   updateMcqWeightingAction,
   updatePrimaryDeadlineAction,
   uploadSeatsAction,
 } from "../../actions";
+import { AbsenceToggleButton } from "./AbsenceToggleButton";
 import { ResetSeatsForm } from "./ResetSeatsForm";
 import { computeWeightedGrade } from "@/lib/weighted";
 import { SEAT_ORDER_ASC, SEAT_ORDER_DESC } from "@/lib/seatSort";
@@ -573,33 +573,17 @@ export default async function AdminExamPage({
                   <td className="px-4 py-2 font-mono">{s.seat_number}</td>
                   <td className="px-4 py-2 font-mono">{s.cid}</td>
                   <td className="px-4 py-2 text-center">
-                    <form
-                      action={async () => {
-                        "use server";
-                        await toggleAbsentAction(exam.id, s.id);
-                      }}
-                    >
-                      <button
-                        type="submit"
-                        aria-label={
-                          s.absent
-                            ? "Mark student as present"
-                            : "Mark student as absent"
-                        }
-                        title={
-                          s.absent
-                            ? "Absent — click to mark present"
-                            : "Present — click to mark absent"
-                        }
-                        className={`rounded px-2 py-0.5 text-xs font-medium ${
-                          s.absent
-                            ? "bg-slate-800 text-white"
-                            : "border bg-white text-slate-500 hover:bg-slate-50"
-                        }`}
-                      >
-                        {s.absent ? "Absent" : "Present"}
-                      </button>
-                    </form>
+                    <AbsenceToggleButton
+                      examId={exam.id}
+                      submissionId={s.id}
+                      isAbsent={s.absent}
+                      hasGrades={
+                        s.grade !== null ||
+                        s.secondary_grade !== null ||
+                        s.final_grade !== null ||
+                        s.mcq_score !== null
+                      }
+                    />
                   </td>
                   {exam.mcq_enabled && (
                     <td className="px-4 py-2">
