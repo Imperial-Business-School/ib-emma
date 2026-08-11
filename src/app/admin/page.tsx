@@ -8,7 +8,11 @@ import {
 } from "@/lib/db";
 import { STATUS_BADGE_CLASS } from "@/lib/examStatus";
 import { sweepDeadlineStatuses } from "@/lib/deadlines";
-import { formatDate, formatDateOnly } from "@/lib/datetime";
+import {
+  formatDate,
+  formatDateOnly,
+  formatDateTime as formatDateTimeUk,
+} from "@/lib/datetime";
 
 export const dynamic = "force-dynamic";
 
@@ -126,7 +130,18 @@ export default async function AdminDashboard() {
   return (
     <div className="space-y-8">
       <section>
-        <p className="text-xs text-slate-500">Today: {formatDate(new Date())}</p>
+        <p className="flex flex-wrap items-center gap-x-4 text-xs text-slate-500">
+          <span>Today: {formatDate(new Date())}</span>
+          <span>
+            Version:{" "}
+            <span className="font-mono">
+              {(process.env.APP_COMMIT_SHA ?? "dev").slice(0, 7)}
+            </span>
+          </span>
+          <span>
+            Deployed: {formatDateTimeUk(process.env.APP_BUILD_TIME)}
+          </span>
+        </p>
         <h1 className="mt-1 text-2xl font-bold">Dashboard</h1>
         <p className="mt-1 text-sm text-slate-600">
           Quick view of what needs attention.
