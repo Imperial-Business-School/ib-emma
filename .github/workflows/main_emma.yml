@@ -44,7 +44,7 @@ jobs:
       # round-trip does not preserve the executable bit on node_modules/.bin,
       # which is what made the container exit 127 on startup.
       - name: Zip artifact for deployment
-        run: zip -r release.zip . -x '.git/*' '.next/cache/*'
+        run: zip -ry release.zip . -x '.git/*' '.next/cache/*'
 
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v4
@@ -79,3 +79,8 @@ jobs:
           app-name: 'emma'
           slot-name: 'Production'
           package: release.zip
+          # Invoke Next's real entry point rather than node_modules/.bin/next.
+          # The .bin entry is a symlink whose relative requires only resolve
+          # from its target, so it breaks if anything along the way turns it
+          # back into a plain file.
+          startup-command: 'node node_modules/next/dist/bin/next start'
