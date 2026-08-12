@@ -129,23 +129,32 @@ export default async function AdminDashboard() {
 
   return (
     <div className="space-y-8">
-      <section>
-        <p className="flex flex-wrap items-center gap-x-4 text-xs text-slate-500">
-          <span>Today: {formatDate(new Date())}</span>
-          <span>
-            Version:{" "}
-            <span className="font-mono">
-              {(process.env.APP_COMMIT_SHA ?? "dev").slice(0, 7)}
+      <section className="flex items-start justify-between gap-6">
+        <div>
+          <p className="flex flex-wrap items-center gap-x-4 text-xs text-slate-500">
+            <span>Today: {formatDate(new Date())}</span>
+            <span>
+              Version:{" "}
+              <span className="font-mono">
+                {(process.env.APP_COMMIT_SHA ?? "dev").slice(0, 7)}
+              </span>
             </span>
-          </span>
-          <span>
-            Deployed: {formatDateTimeUk(process.env.APP_BUILD_TIME)}
-          </span>
-        </p>
-        <h1 className="mt-1 text-2xl font-bold">Dashboard</h1>
-        <p className="mt-1 text-sm text-slate-600">
-          Quick view of what needs attention.
-        </p>
+            <span>
+              Deployed: {formatDateTimeUk(process.env.APP_BUILD_TIME)}
+            </span>
+          </p>
+          <h1 className="mt-1 text-2xl font-bold">Dashboard</h1>
+          <p className="mt-1 text-sm text-slate-600">
+            Quick view of what needs attention.
+          </p>
+        </div>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/imperial-business-school.png"
+          alt="Imperial Business School"
+          width={300}
+          className="h-auto w-[300px] max-w-full shrink-0"
+        />
       </section>
 
       {/* Search + quick links */}
