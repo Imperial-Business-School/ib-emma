@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { ProgrammeLevel } from "@/lib/examStatus";
+import { todayUkIsoDate } from "@/lib/datetime";
 import { createExamAction } from "./actions";
 
 type Prog = {
@@ -24,6 +25,7 @@ export function CreateExamForm({
   const [secondaryEmail, setSecondaryEmail] = useState("");
   const [mcqEnabled, setMcqEnabled] = useState(false);
   const [mcqWeighting, setMcqWeighting] = useState("");
+  const today = todayUkIsoDate();
   const [error, setError] = useState<string | null>(null);
 
   const emailsMatch =
@@ -229,6 +231,7 @@ export function CreateExamForm({
         <input
           type="date"
           name="primary_deadline"
+          min={today}
           required
           className="mt-1 w-full rounded border px-3 py-2 text-sm"
         />
@@ -243,6 +246,7 @@ export function CreateExamForm({
         <input
           type="date"
           name="secondary_deadline"
+          min={today}
           required
           className="mt-1 w-full rounded border px-3 py-2 text-sm"
         />

@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 import { findOrCreateUser } from "@/lib/auth";
 import { query, queryOne, randomToken, type Exam } from "@/lib/db";
 import { parseCsv } from "@/lib/csv";
-import { parseUkLocalDateTime } from "@/lib/datetime";
+import { parseUkLocalDateTime, todayUkIsoDate } from "@/lib/datetime";
 import {
   buildMarkerEmail,
   markerUrl,
@@ -30,6 +30,20 @@ function parseDeadline(input: FormDataEntryValue | null): string | null {
   const m = v.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (!m) throw new Error("Deadline is not a valid date");
   return `${m[1]}-${m[2]}-${m[3]}`;
+}
+
+// Same as parseDeadline but refuses any date earlier than today (UK).
+// Use when the caller is entering a NEW deadline. Stored past-date
+// deadlines from earlier are read back unchanged.
+function parseFutureDeadline(
+  input: FormDataEntryValue | null,
+  label: string,
+): string | null {
+  const d = parseDeadline(input);
+  if (d && d < todayUkIsoDate()) {
+    throw new Error(`${label} cannot be in the past`);
+  }
+  return d;
 }
 
 function parseEmail(input: FormDataEntryValue | null): string {
@@ -57,8 +71,14 @@ export async function createExamAction(formData: FormData) {
       ? academicYearRaw
       : null;
   const samplingMode = parseSamplingMode(formData.get("sampling_mode"));
-  const primaryDeadline = parseDeadline(formData.get("primary_deadline"));
-  const secondaryDeadline = parseDeadline(formData.get("secondary_deadline"));
+  const primaryDeadline = parseFutureDeadline(
+    formData.get("primary_deadline"),
+    "Primary marker deadline",
+  );
+  const secondaryDeadline = parseFutureDeadline(
+    formData.get("secondary_deadline"),
+    "Second marker deadline",
+  );
   const programmeIdRaw = String(formData.get("programme_id") ?? "").trim();
   const programmeId = programmeIdRaw ? Number(programmeIdRaw) : null;
   const mcqEnabled = formData.get("mcq_enabled") === "on";
@@ -331,9 +351,35 @@ export async function updatePrimaryDeadlineAction(
   examId: number,
   formData: FormData,
 ) {
-  const deadline = parseDeadline(formData.get("primary_deadline"));
+  const deadline = parseFutureDeadline(
+    formData.get("primary_deadline"),
+    "Primary marker deadline",
+  );
   await query(
-    "UPDATE exams SET primary_deadline_date = $1 WHERE id = $2 AND status = 'setup'",
+    `UPDATE exams
+     SET primary_deadline_date = $1,
+         primary_overdue_notified_at = NULL,
+         primary_late_notified_at = NULL
+     WHERE id = $2`,
+    [deadline, examId],
+  );
+  revalidatePath(`/admin/exams/${examId}`);
+}
+
+export async function updateSecondaryDeadlineAction(
+  examId: number,
+  formData: FormData,
+) {
+  const deadline = parseFutureDeadline(
+    formData.get("secondary_deadline"),
+    "Second marker deadline",
+  );
+  await query(
+    `UPDATE exams
+     SET secondary_deadline_date = $1,
+         secondary_overdue_notified_at = NULL,
+         secondary_late_notified_at = NULL
+     WHERE id = $2`,
     [deadline, examId],
   );
   revalidatePath(`/admin/exams/${examId}`);
@@ -567,8 +613,9 @@ export async function startSecondaryMarkingAction(
   if (exam.status !== "first_marking_review") {
     throw new Error("Exam is not awaiting admin review");
   }
-  const secondaryDeadline = parseDeadline(
+  const secondaryDeadline = parseFutureDeadline(
     formData.get("secondary_deadline"),
+    "Second marker deadline",
   );
   if (!secondaryDeadline) {
     throw new Error(
@@ -673,6 +720,32 @@ export async function uploadSeatsActionState(
 ): Promise<SaveState> {
   try {
     await uploadSeatsAction(examId, formData);
+    return { ok: true, error: null };
+  } catch (e) {
+    return toErrorState(e);
+  }
+}
+
+export async function updatePrimaryDeadlineActionState(
+  examId: number,
+  _prev: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
+  try {
+    await updatePrimaryDeadlineAction(examId, formData);
+    return { ok: true, error: null };
+  } catch (e) {
+    return toErrorState(e);
+  }
+}
+
+export async function updateSecondaryDeadlineActionState(
+  examId: number,
+  _prev: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
+  try {
+    await updateSecondaryDeadlineAction(examId, formData);
     return { ok: true, error: null };
   } catch (e) {
     return toErrorState(e);

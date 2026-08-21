@@ -23,9 +23,11 @@ import {
   startSecondaryMarkingAction,
   toggleInSampleAction,
   updateMcqWeightingAction,
-  updatePrimaryDeadlineAction,
+  updatePrimaryDeadlineActionState,
+  updateSecondaryDeadlineActionState,
 } from "../../actions";
 import { AbsenceToggleButton } from "./AbsenceToggleButton";
+import { DeadlineForm } from "./DeadlineForm";
 import { InlineSaveForm } from "./InlineSaveForm";
 import { ResetSeatsForm } from "./ResetSeatsForm";
 import { SeatUploadForm } from "./SeatUploadForm";
@@ -38,7 +40,7 @@ import {
 } from "@/lib/seatSort";
 import { McqUploadPanel } from "./McqUploadPanel";
 import { DeleteExamForm } from "./DeleteExamForm";
-import { formatDateOnly, formatDateTime } from "@/lib/datetime";
+import { formatDateOnly, formatDateTime, todayUkIsoDate } from "@/lib/datetime";
 
 export const dynamic = "force-dynamic";
 
@@ -222,6 +224,7 @@ export default async function AdminExamPage({
               <input
                 type="date"
                 name="secondary_deadline"
+                min={todayUkIsoDate()}
                 required
                 className="mt-1 rounded border px-2 py-1 text-sm"
               />
@@ -273,53 +276,33 @@ export default async function AdminExamPage({
           <p className="text-xs font-semibold uppercase text-slate-500">
             Primary marker deadline
           </p>
-          {exam.status === "setup" ? (
-            <form
-              action={async (fd) => {
-                "use server";
-                await updatePrimaryDeadlineAction(exam.id, fd);
-              }}
-              className="mt-2 flex flex-wrap items-end gap-2"
-            >
-              <input
-                type="date"
-                name="primary_deadline"
-                defaultValue={exam.primary_deadline_date ?? ""}
-                className="rounded border px-2 py-1 text-sm"
-              />
-              <button
-                type="submit"
-                className="rounded border bg-white px-2 py-1 text-xs hover:bg-slate-50"
-              >
-                Save
-              </button>
-              <p className="basis-full text-xs text-slate-500">
-                Deadline is end of that day, UK time.
-              </p>
-            </form>
-          ) : exam.primary_deadline_date ? (
+          {exam.primary_deadline_date && (
             <p className="mt-1 font-medium">
               End of {formatDateOnly(exam.primary_deadline_date)} (UK time)
             </p>
-          ) : (
-            <p className="mt-1 text-sm text-slate-400">Not set</p>
           )}
+          <DeadlineForm
+            action={updatePrimaryDeadlineActionState.bind(null, exam.id)}
+            name="primary_deadline"
+            defaultValue={exam.primary_deadline_date ?? ""}
+            helper="Deadline is end of that day, UK time."
+          />
         </div>
         <div className="rounded-lg border bg-white p-4 shadow-sm">
           <p className="text-xs font-semibold uppercase text-slate-500">
             Second marker deadline
           </p>
-          {exam.secondary_deadline_date ? (
+          {exam.secondary_deadline_date && (
             <p className="mt-1 font-medium">
               End of {formatDateOnly(exam.secondary_deadline_date)} (UK time)
             </p>
-          ) : (
-            <p className="mt-1 text-sm text-slate-400">
-              {exam.status === "first_marking_review"
-                ? "Set when you click Start second marking"
-                : "Not set"}
-            </p>
           )}
+          <DeadlineForm
+            action={updateSecondaryDeadlineActionState.bind(null, exam.id)}
+            name="secondary_deadline"
+            defaultValue={exam.secondary_deadline_date ?? ""}
+            helper="Deadline is end of that day, UK time."
+          />
         </div>
       </section>
 

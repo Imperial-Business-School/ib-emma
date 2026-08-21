@@ -129,6 +129,19 @@ export function formatDateOnly(dateStr: string | null | undefined): string {
   return `${d}/${mo}/${y}`;
 }
 
+// Today's UK date as a "YYYY-MM-DD" string. Used to enforce
+// "no deadlines in the past" both as the `min` attribute on <input
+// type="date"> and as a server-side check in the corresponding actions.
+export function todayUkIsoDate(): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+  return parts;
+}
+
 // Format an ISO timestamp into the "YYYY-MM-DDTHH:MM" shape expected by
 // <input type="datetime-local">, using Europe/London time.
 export function toDatetimeLocalValue(
