@@ -355,11 +355,18 @@ export async function updatePrimaryDeadlineAction(
     formData.get("primary_deadline"),
     "Primary marker deadline",
   );
+  // Also snap status out of overdue/late so the sweep can re-diagnose
+  // against the new date. Other statuses are left alone.
   await query(
     `UPDATE exams
      SET primary_deadline_date = $1,
          primary_overdue_notified_at = NULL,
-         primary_late_notified_at = NULL
+         primary_late_notified_at = NULL,
+         status = CASE
+           WHEN status IN ('first_marking_overdue', 'first_marking_late')
+             THEN 'primary_marking'
+           ELSE status
+         END
      WHERE id = $2`,
     [deadline, examId],
   );
@@ -378,7 +385,12 @@ export async function updateSecondaryDeadlineAction(
     `UPDATE exams
      SET secondary_deadline_date = $1,
          secondary_overdue_notified_at = NULL,
-         secondary_late_notified_at = NULL
+         secondary_late_notified_at = NULL,
+         status = CASE
+           WHEN status IN ('second_marking_overdue', 'second_marking_late')
+             THEN 'secondary_marking'
+           ELSE status
+         END
      WHERE id = $2`,
     [deadline, examId],
   );
