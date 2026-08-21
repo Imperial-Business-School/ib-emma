@@ -212,6 +212,8 @@ export function buildMarkerEmail(opts: {
         ? "This marking is now at least five working days overdue. The exam manager has been copied on this reminder."
         : "Please submit your grades as soon as possible.",
       "",
+      "If you need to discuss an extension to the marking deadline, or have any challenges in completing the marking, please get in touch with the Exams team.",
+      "",
       `Open the marking screen: ${opts.url}`,
       "",
       "Thank you,",
