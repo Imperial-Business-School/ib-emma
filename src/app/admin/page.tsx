@@ -153,7 +153,7 @@ export default async function AdminDashboard() {
           src="/imperial-business-school.png"
           alt="Imperial Business School"
           width={300}
-          className="h-auto w-[300px] max-w-full shrink-0"
+          className="h-auto w-[min(300px,35vw)]"
         />
       </section>
 
