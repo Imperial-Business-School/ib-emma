@@ -494,17 +494,51 @@ export async function uploadSeatsAction(examId: number, formData: FormData) {
 export async function addSeatAction(examId: number, formData: FormData) {
   const seat = String(formData.get("seat") ?? "").trim();
   const cid = String(formData.get("cid") ?? "").trim();
-  if (!seat || !cid) return;
+  if (!seat || !cid) {
+    throw new Error("Both seat number and CID are required");
+  }
+
+  // Reject if either the seat_number or the CID is already used on
+  // this exam. Every seat must map to exactly one CID and vice versa.
+  const clash = await queryOne<{ seat_number: string; cid: string }>(
+    `SELECT seat_number, cid FROM submissions
+     WHERE exam_id = $1 AND (seat_number = $2 OR cid = $3)
+     LIMIT 1`,
+    [examId, seat, cid],
+  );
+  if (clash) {
+    if (clash.seat_number === seat && clash.cid === cid) {
+      throw new Error(`Seat ${seat} with CID ${cid} is already in this exam`);
+    }
+    if (clash.seat_number === seat) {
+      throw new Error(
+        `Seat ${seat} is already in this exam (currently linked to CID ${clash.cid})`,
+      );
+    }
+    throw new Error(
+      `CID ${cid} is already in this exam (currently on seat ${clash.seat_number})`,
+    );
+  }
 
   await query(
-    `INSERT INTO submissions (exam_id, seat_number, cid)
-     VALUES ($1, $2, $3)
-     ON CONFLICT (exam_id, seat_number)
-     DO UPDATE SET cid = EXCLUDED.cid`,
+    `INSERT INTO submissions (exam_id, seat_number, cid) VALUES ($1, $2, $3)`,
     [examId, seat, cid],
   );
 
   revalidatePath(`/admin/exams/${examId}`);
+}
+
+export async function addSeatActionState(
+  examId: number,
+  _prev: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
+  try {
+    await addSeatAction(examId, formData);
+    return { ok: true, error: null };
+  } catch (e) {
+    return toErrorState(e);
+  }
 }
 
 export async function deleteSeatAction(examId: number, submissionId: number) {

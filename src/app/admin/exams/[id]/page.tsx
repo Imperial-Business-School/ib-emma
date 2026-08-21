@@ -12,7 +12,6 @@ import {
 import { STATUS_BADGE_CLASS } from "@/lib/examStatus";
 import { sweepDeadlineStatuses } from "@/lib/deadlines";
 import {
-  addSeatAction,
   adminOverrideGradeActionState,
   deleteSeatAction,
   reassignMarkerAction,
@@ -26,6 +25,7 @@ import {
   updateSecondaryDeadlineActionState,
 } from "../../actions";
 import { AbsenceToggleButton } from "./AbsenceToggleButton";
+import { AddSeatForm } from "./AddSeatForm";
 import { DeadlineForm } from "./DeadlineForm";
 import { InlineSaveForm } from "./InlineSaveForm";
 import { ResetSeatsForm } from "./ResetSeatsForm";
@@ -325,32 +325,7 @@ export default async function AdminExamPage({
           </div>
           <SeatUploadForm examId={exam.id} />
 
-          <form
-            action={async (fd) => {
-              "use server";
-              await addSeatAction(exam.id, fd);
-            }}
-            className="mt-3 flex gap-2"
-          >
-            <input
-              name="seat"
-              placeholder="Seat number"
-              required
-              className="rounded border px-3 py-2 text-sm"
-            />
-            <input
-              name="cid"
-              placeholder="CID"
-              required
-              className="rounded border px-3 py-2 text-sm"
-            />
-            <button
-              type="submit"
-              className="rounded border bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50"
-            >
-              Add seat
-            </button>
-          </form>
+          <AddSeatForm examId={exam.id} />
 
           {canStartMarking && (
             <form
