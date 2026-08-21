@@ -83,13 +83,13 @@ export function ExamFilters({
 
   return (
     <section className="rounded-lg border bg-white p-4 shadow-sm">
-      <div className="grid gap-3 md:grid-cols-[2fr_1fr_1fr_1fr_1fr_1fr_auto]">
+      <div className="flex flex-wrap gap-3">
         <input
           type="search"
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Search by name or module code…"
-          className="rounded border px-3 py-2 text-sm"
+          className="min-w-[200px] flex-1 basis-[220px] rounded border px-3 py-2 text-sm"
         />
         <select
           value={status}
