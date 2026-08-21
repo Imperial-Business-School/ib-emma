@@ -207,8 +207,9 @@ export default async function AdminExamPage({
           </h3>
           <p className="mt-1 text-sm text-purple-800">
             {sampleCount} of {totalSeats} seats are currently selected for
-            second marking. Click the star on any row below to add or remove a
-            seat. When you&apos;re happy, click <em>Start second marking</em>.
+            second marking. Tick or untick the checkbox on any row below to
+            add or remove a seat. When you&apos;re happy, click{" "}
+            <em>Start second marking</em>.
           </p>
           <form
             action={async (fd) => {
