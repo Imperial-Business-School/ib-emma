@@ -238,11 +238,12 @@ export function CreateExamForm({
       </label>
       <label className="text-sm md:col-span-2">
         <span className="block text-xs font-medium text-slate-600">
-          Second marker deadline (optional; can be set at 'Start second marking' instead)
+          Second marker deadline
         </span>
         <input
           type="date"
           name="secondary_deadline"
+          required
           className="mt-1 w-full rounded border px-3 py-2 text-sm"
         />
       </label>

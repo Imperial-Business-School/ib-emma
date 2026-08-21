@@ -82,6 +82,9 @@ export async function createExamAction(formData: FormData) {
   if (!primaryDeadline) {
     throw new Error("Primary marker deadline is required");
   }
+  if (!secondaryDeadline) {
+    throw new Error("Second marker deadline is required");
+  }
 
   const primaryEmail = parseEmail(formData.get("primary_email"));
   const primaryName =
