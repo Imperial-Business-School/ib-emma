@@ -9,7 +9,7 @@ import {
 } from "@/lib/db";
 import { STATUS_BADGE_CLASS } from "@/lib/examStatus";
 import { sweepDeadlineStatuses } from "@/lib/deadlines";
-import { ExamFilters } from "../admin/ExamFilters";
+import { ExamFilters, type ExamType } from "../admin/ExamFilters";
 import { formatDate } from "@/lib/datetime";
 
 async function getOrigin(): Promise<string> {
@@ -57,6 +57,11 @@ function parseInt1(v: string | undefined, fallback: number): number {
   return Math.floor(n);
 }
 
+function parseType(v: string | undefined): ExamType | null {
+  if (v === "main" || v === "resit") return v;
+  return null;
+}
+
 export default async function ExamsListPage({
   searchParams,
 }: {
@@ -66,6 +71,9 @@ export default async function ExamsListPage({
     sort?: string;
     page?: string;
     pageSize?: string;
+    programme?: string;
+    year?: string;
+    type?: string;
   }>;
 }) {
   await sweepDeadlineStatuses({ origin: await getOrigin() });
@@ -75,6 +83,27 @@ export default async function ExamsListPage({
   const sort = parseSort(sp.sort);
   const pageSize = Math.min(100, parseInt1(sp.pageSize, PAGE_SIZE_DEFAULT));
   const page = parseInt1(sp.page, 1);
+  const programmeIdRaw = sp.programme?.trim();
+  const programmeId =
+    programmeIdRaw && /^\d+$/.test(programmeIdRaw)
+      ? Number(programmeIdRaw)
+      : null;
+  const academicYear =
+    sp.year && /^\d{2}\/\d{2}$/.test(sp.year.trim()) ? sp.year.trim() : null;
+  const type = parseType(sp.type);
+
+  // Options for the filter dropdowns. Academic-year list comes from the
+  // exams actually stored (distinct, newest first).
+  const programmes = await query<{ id: number; name: string }>(
+    "SELECT id, name FROM programmes ORDER BY lower(name)",
+  );
+  const academicYears = (
+    await query<{ academic_year: string }>(
+      `SELECT DISTINCT academic_year FROM exams
+       WHERE academic_year IS NOT NULL
+       ORDER BY academic_year DESC`,
+    )
+  ).map((r) => r.academic_year);
 
   const whereParts: string[] = [];
   const whereParams: unknown[] = [];
@@ -87,6 +116,18 @@ export default async function ExamsListPage({
   if (status) {
     whereParams.push(status);
     whereParts.push(`e.status = $${whereParams.length}`);
+  }
+  if (programmeId != null) {
+    whereParams.push(programmeId);
+    whereParts.push(`e.programme_id = $${whereParams.length}`);
+  }
+  if (academicYear) {
+    whereParams.push(academicYear);
+    whereParts.push(`e.academic_year = $${whereParams.length}`);
+  }
+  if (type) {
+    whereParams.push(type === "resit");
+    whereParts.push(`e.is_resit = $${whereParams.length}`);
   }
   const whereSql = whereParts.length ? `WHERE ${whereParts.join(" AND ")}` : "";
 
@@ -118,6 +159,9 @@ export default async function ExamsListPage({
     if (sort !== "created_desc") params.set("sort", sort);
     if (pageSize !== PAGE_SIZE_DEFAULT) params.set("pageSize", String(pageSize));
     if (safePage !== 1) params.set("page", String(safePage));
+    if (programmeId != null) params.set("programme", String(programmeId));
+    if (academicYear) params.set("year", academicYear);
+    if (type) params.set("type", type);
     for (const [k, v] of Object.entries(overrides)) {
       if (v == null || v === "") params.delete(k);
       else params.set(k, String(v));
@@ -151,6 +195,11 @@ export default async function ExamsListPage({
         initialStatus={status ?? "all"}
         initialSort={sort}
         initialPageSize={pageSize}
+        initialProgrammeId={programmeId ?? "all"}
+        initialAcademicYear={academicYear ?? "all"}
+        initialType={type ?? "all"}
+        programmes={programmes}
+        academicYears={academicYears}
       />
 
       <section className="rounded-lg border bg-white shadow-sm">
@@ -210,7 +259,14 @@ export default async function ExamsListPage({
             )}
             {exams.map((e) => (
               <tr key={e.id} className="border-b last:border-b-0">
-                <td className="px-4 py-3 font-medium">{e.name}</td>
+                <td className="px-4 py-3 font-medium">
+                  {e.name}
+                  {e.is_resit && (
+                    <span className="ml-2 rounded bg-orange-100 px-1.5 py-0.5 text-xs font-medium text-orange-800">
+                      Resit
+                    </span>
+                  )}
+                </td>
                 <td className="px-4 py-3 text-slate-600">{e.code ?? "—"}</td>
                 <td className="px-4 py-3">
                   <StatusBadge status={e.status} />

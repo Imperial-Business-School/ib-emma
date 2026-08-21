@@ -167,8 +167,17 @@ export default async function AdminExamPage({
               </span>
             </p>
           )}
-          <p className="mt-2 flex items-center gap-2">
+          <p className="mt-2 flex flex-wrap items-center gap-2">
             <StatusBadge status={exam.status} />
+            <span
+              className={`rounded px-2 py-0.5 text-xs font-medium ${
+                exam.is_resit
+                  ? "bg-orange-100 text-orange-800"
+                  : "bg-slate-100 text-slate-700"
+              }`}
+            >
+              {exam.is_resit ? "Resit" : "Main sitting"}
+            </span>
             <span className="text-xs text-slate-500">
               {exam.sampling_mode === "full"
                 ? "Full second marking"

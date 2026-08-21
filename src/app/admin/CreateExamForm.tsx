@@ -121,6 +121,18 @@ export function CreateExamForm({
       </label>
       <fieldset className="rounded border bg-slate-50 p-3 md:col-span-2">
         <legend className="px-1 text-xs font-semibold uppercase text-slate-500">
+          Exam type
+        </legend>
+        <label className="mt-1 flex items-start gap-2 text-sm">
+          <input type="checkbox" name="is_resit" className="mt-1" />
+          <span>
+            Resit exam? Tick this box if this exam is a resit sitting.
+            Leave unticked for the main sitting.
+          </span>
+        </label>
+      </fieldset>
+      <fieldset className="rounded border bg-slate-50 p-3 md:col-span-2">
+        <legend className="px-1 text-xs font-semibold uppercase text-slate-500">
           MCQ element
         </legend>
         <label className="mt-1 flex items-start gap-2 text-sm">

@@ -82,6 +82,7 @@ export async function createExamAction(formData: FormData) {
   const programmeIdRaw = String(formData.get("programme_id") ?? "").trim();
   const programmeId = programmeIdRaw ? Number(programmeIdRaw) : null;
   const mcqEnabled = formData.get("mcq_enabled") === "on";
+  const isResit = formData.get("is_resit") === "on";
   const mcqWeightingRaw = String(formData.get("mcq_weighting") ?? "").trim();
   let mcqWeighting: number | null = null;
   if (mcqEnabled) {
@@ -128,8 +129,8 @@ export async function createExamAction(formData: FormData) {
         secondary_marker_id, status, sampling_mode,
         primary_access_token, secondary_access_token,
         primary_deadline_date, secondary_deadline_date, programme_id,
-        mcq_enabled, mcq_weighting)
-     VALUES ($1, $2, $3, $4, $5, $6, 'setup', $7, $8, $9, $10, $11, $12, $13, $14)
+        mcq_enabled, mcq_weighting, is_resit)
+     VALUES ($1, $2, $3, $4, $5, $6, 'setup', $7, $8, $9, $10, $11, $12, $13, $14, $15)
      RETURNING id`,
     [
       name,
@@ -146,6 +147,7 @@ export async function createExamAction(formData: FormData) {
       programmeId,
       mcqEnabled,
       mcqWeighting,
+      isResit,
     ],
   );
   if (!row) throw new Error("Failed to create exam");

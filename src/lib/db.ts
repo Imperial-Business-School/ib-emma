@@ -172,6 +172,7 @@ async function initSchema(): Promise<void> {
     ALTER TABLE exams ADD COLUMN IF NOT EXISTS academic_year TEXT;
     ALTER TABLE exams ADD COLUMN IF NOT EXISTS mcq_enabled BOOLEAN NOT NULL DEFAULT false;
     ALTER TABLE exams ADD COLUMN IF NOT EXISTS mcq_weighting NUMERIC(5,2);
+    ALTER TABLE exams ADD COLUMN IF NOT EXISTS is_resit BOOLEAN NOT NULL DEFAULT false;
 
     ALTER TABLE submissions ADD COLUMN IF NOT EXISTS absent BOOLEAN NOT NULL DEFAULT false;
     ALTER TABLE submissions ADD COLUMN IF NOT EXISTS mcq_score TEXT;
@@ -330,6 +331,7 @@ export type Exam = {
   academic_year: string | null;
   mcq_enabled: boolean;
   mcq_weighting: string | null;
+  is_resit: boolean;
 };
 
 export type Submission = {
