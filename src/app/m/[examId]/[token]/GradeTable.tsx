@@ -245,7 +245,11 @@ export function GradeTable({
             disabled={pendingIds.size > 0}
             className="rounded bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-400"
           >
-            {dirtyCount > 0 ? `Save all (${dirtyCount} unsaved)` : "Save all"}
+            {pendingIds.size > 0
+              ? "Submitting…"
+              : dirtyCount > 0
+                ? `Save all (${dirtyCount} unsaved)`
+                : "Save all"}
           </button>
         )}
       </div>
@@ -418,7 +422,7 @@ export function GradeTable({
                         disabled={saving}
                         className="rounded border bg-white px-2 py-1 text-xs hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100"
                       >
-                        {saving ? "Saving…" : "Save"}
+                        {saving ? "Submitting…" : "Save"}
                       </button>
                     </div>
                   )}

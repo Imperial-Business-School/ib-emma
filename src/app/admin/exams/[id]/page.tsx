@@ -31,6 +31,7 @@ import { InlineSaveForm } from "./InlineSaveForm";
 import { ResetSeatsForm } from "./ResetSeatsForm";
 import { SampleToggle } from "./SampleToggle";
 import { SeatUploadForm } from "./SeatUploadForm";
+import { SubmitButton } from "@/components/SubmitButton";
 import { computeWeightedGrade } from "@/lib/weighted";
 import {
   CID_ORDER_ASC,
@@ -232,13 +233,11 @@ export default async function AdminExamPage({
                 className="mt-1 rounded border px-2 py-1 text-sm"
               />
             </label>
-            <button
-              type="submit"
+            <SubmitButton
+              label="Start second marking → notify second marker"
               disabled={sampleCount === 0}
               className="rounded bg-purple-700 px-3 py-2 text-sm font-medium text-white hover:bg-purple-800 disabled:cursor-not-allowed disabled:bg-slate-300"
-            >
-              Start second marking → notify second marker
-            </button>
+            />
           </form>
         </div>
       )}
@@ -337,12 +336,10 @@ export default async function AdminExamPage({
               }}
               className="mt-6 border-t pt-4"
             >
-              <button
-                type="submit"
-                className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-              >
-                Start primary marking
-              </button>
+              <SubmitButton
+                label="Start primary marking"
+                className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-400"
+              />
               <p className="mt-2 text-xs text-slate-500">
                 Sampling mode locks at this point. Send the primary marker URL
                 shown above to {primaryMarker?.email ?? "the primary marker"}.
@@ -379,12 +376,10 @@ export default async function AdminExamPage({
                 className="mt-1 w-40 rounded border px-3 py-2 text-sm"
               />
             </label>
-            <button
-              type="submit"
-              className="rounded bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-700"
-            >
-              Save weighting
-            </button>
+            <SubmitButton
+              label="Save weighting"
+              className="rounded bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-400"
+            />
           </form>
           {exam.status === "setup" && (
             <div className="mt-4">
@@ -674,12 +669,10 @@ export default async function AdminExamPage({
                           await deleteSeatAction(exam.id, s.id);
                         }}
                       >
-                        <button
-                          type="submit"
-                          className="text-xs text-red-600 hover:underline"
-                        >
-                          Remove
-                        </button>
+                        <SubmitButton
+                          label="Remove"
+                          className="text-xs text-red-600 hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+                        />
                       </form>
                     )}
                   </td>
@@ -789,12 +782,10 @@ function MarkerCard({
               }}
               className="mt-2"
             >
-              <button
-                type="submit"
-                className="rounded border bg-white px-2 py-1 text-xs hover:bg-slate-50"
-              >
-                Regenerate
-              </button>
+              <SubmitButton
+                label="Regenerate"
+                className="rounded border bg-white px-2 py-1 text-xs hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              />
             </form>
           </details>
         </div>
@@ -823,12 +814,10 @@ function MarkerCard({
             placeholder="Name (optional)"
             className="rounded border px-2 py-1 text-sm"
           />
-          <button
-            type="submit"
-            className="rounded border bg-white px-2 py-1 text-xs hover:bg-slate-50"
-          >
-            Save
-          </button>
+          <SubmitButton
+            label="Save"
+            className="rounded border bg-white px-2 py-1 text-xs hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+          />
         </form>
       </details>
     </div>

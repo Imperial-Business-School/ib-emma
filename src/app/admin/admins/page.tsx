@@ -1,5 +1,6 @@
 import { query, type Admin } from "@/lib/db";
 import { formatDateTime } from "@/lib/datetime";
+import { SubmitButton } from "@/components/SubmitButton";
 import { createAdminAction } from "./actions";
 import { AdminRow } from "./AdminRow";
 
@@ -40,12 +41,10 @@ export default async function AdminsPage() {
             placeholder="email@imperial.ac.uk"
             className="rounded border px-3 py-2 text-sm"
           />
-          <button
-            type="submit"
-            className="rounded bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-700"
-          >
-            Add
-          </button>
+          <SubmitButton
+            label="Add"
+            className="rounded bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-400"
+          />
         </form>
       </section>
 

@@ -64,7 +64,7 @@ export function QuickEntryForm({
           disabled={pending}
           className="rounded bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-400"
         >
-          {pending ? "Saving…" : "Save"}
+          {pending ? "Submitting…" : "Save"}
         </button>
       </div>
       {state.error && (

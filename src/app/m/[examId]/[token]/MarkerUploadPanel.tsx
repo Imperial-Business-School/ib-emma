@@ -108,7 +108,7 @@ export function MarkerUploadPanel({
           disabled={pending}
           className="rounded bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {pending ? "Uploading…" : "Upload grades CSV"}
+          {pending ? "Submitting…" : "Upload grades CSV"}
         </button>
       </form>
       {summary && (

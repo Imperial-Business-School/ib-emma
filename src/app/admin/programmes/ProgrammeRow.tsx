@@ -103,7 +103,7 @@ export function ProgrammeRow({ programme }: { programme: Programme }) {
               disabled={pending}
               className="rounded bg-slate-900 px-2 py-1 text-xs text-white hover:bg-slate-700 disabled:opacity-50"
             >
-              {pending ? "Saving…" : "Save"}
+              {pending ? "Submitting…" : "Save"}
             </button>
             <button
               type="button"

@@ -57,7 +57,7 @@ export function DeleteExamForm({
           disabled={pending}
           className="rounded border border-red-300 bg-white px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {pending ? "Deleting…" : "Delete this exam"}
+          {pending ? "Submitting…" : "Delete this exam"}
         </button>
       </div>
       {error && <p className="mt-2 text-sm text-red-700">{error}</p>}

@@ -61,7 +61,7 @@ export function McqUploadPanel({ examId }: { examId: number }) {
           disabled={pending}
           className="rounded bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-50"
         >
-          {pending ? "Uploading…" : "Upload MCQ scores"}
+          {pending ? "Submitting…" : "Upload MCQ scores"}
         </button>
       </form>
       {summary && <p className="mt-2 text-sm text-green-700">{summary}</p>}

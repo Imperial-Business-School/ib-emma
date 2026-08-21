@@ -3,31 +3,40 @@
 import { useEffect, useRef } from "react";
 import { useFormStatus } from "react-dom";
 
-// Submit button that disables itself while its parent <form>'s server
-// action is in flight, so a double click doesn't re-fire the action
-// against a state the first click has already advanced. Also scrolls
-// the page back to the top when the action completes so the marker
-// notices the newly rendered success banner instead of staying deep
-// inside the grades table.
+// Reusable submit button. While its parent <form>'s action is in
+// flight, the button is disabled and its label swaps to
+// "Submitting…", so the user always knows their click has registered
+// and a second click can't re-fire the action.
+//
+// Optional scrollToTop prop scrolls the window to the top when the
+// pending state ends (used for large state transitions like the
+// marker completion buttons, so the fresh page state is visible).
 export function SubmitButton({
   label,
   pendingLabel = "Submitting…",
   disabled = false,
   className,
+  scrollToTop = false,
 }: {
   label: string;
   pendingLabel?: string;
   disabled?: boolean;
   className?: string;
+  scrollToTop?: boolean;
 }) {
   const { pending } = useFormStatus();
   const wasPending = useRef(false);
   useEffect(() => {
-    if (wasPending.current && !pending && typeof window !== "undefined") {
+    if (
+      scrollToTop &&
+      wasPending.current &&
+      !pending &&
+      typeof window !== "undefined"
+    ) {
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
     wasPending.current = pending;
-  }, [pending]);
+  }, [pending, scrollToTop]);
   return (
     <button
       type="submit"

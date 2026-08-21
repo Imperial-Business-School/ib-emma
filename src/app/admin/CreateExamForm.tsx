@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { ProgrammeLevel } from "@/lib/examStatus";
 import { todayUkIsoDate } from "@/lib/datetime";
+import { SubmitButton } from "@/components/SubmitButton";
 import { createExamAction } from "./actions";
 
 type Prog = {
@@ -251,13 +252,11 @@ export function CreateExamForm({
           className="mt-1 w-full rounded border px-3 py-2 text-sm"
         />
       </label>
-      <button
-        type="submit"
+      <SubmitButton
+        label="Create exam"
         disabled={emailsMatch}
         className="rounded bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50 md:col-span-2"
-      >
-        Create exam
-      </button>
+      />
     </form>
   );
 }

@@ -16,7 +16,7 @@ import {
 import { GradeTable, type GradeRow } from "./GradeTable";
 import { MarkerUploadPanel } from "./MarkerUploadPanel";
 import { QuickEntryForm } from "./QuickEntryForm";
-import { SubmitButton } from "./SubmitButton";
+import { SubmitButton } from "@/components/SubmitButton";
 
 export const dynamic = "force-dynamic";
 
@@ -298,6 +298,7 @@ export default async function MarkerByTokenPage({
               <SubmitButton
                 label="Submit final marks"
                 disabled={!canComplete}
+                scrollToTop
                 className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
               />
               <p className="mt-2 text-xs text-slate-500">
@@ -315,6 +316,7 @@ export default async function MarkerByTokenPage({
               <SubmitButton
                 label="Submit marks"
                 disabled={!canComplete}
+                scrollToTop
                 className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
               />
               <p className="mt-2 text-xs text-slate-500">
@@ -332,6 +334,7 @@ export default async function MarkerByTokenPage({
               <SubmitButton
                 label="Submit marks"
                 disabled={!canComplete}
+                scrollToTop
                 className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
               />
               <p className="mt-2 text-xs text-slate-500">

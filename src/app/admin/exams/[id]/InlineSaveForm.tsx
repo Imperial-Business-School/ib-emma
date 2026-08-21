@@ -48,7 +48,7 @@ export function InlineSaveForm({
           disabled={pending}
           className="rounded border bg-white px-2 py-1 text-xs hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100"
         >
-          {pending ? "…" : "Save"}
+          {pending ? "Submitting…" : "Save"}
         </button>
       </div>
       {state.error && (

@@ -47,7 +47,7 @@ export function AddSeatForm({ examId }: { examId: number }) {
           disabled={pending}
           className="rounded border bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {pending ? "Adding…" : "Add seat"}
+          {pending ? "Submitting…" : "Add seat"}
         </button>
       </form>
       {state.error && (

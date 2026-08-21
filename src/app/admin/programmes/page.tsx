@@ -1,4 +1,5 @@
 import { PROGRAMME_LEVELS, query, type Programme } from "@/lib/db";
+import { SubmitButton } from "@/components/SubmitButton";
 import { createProgrammeAction } from "./actions";
 import { ProgrammeRow } from "./ProgrammeRow";
 
@@ -49,12 +50,10 @@ export default async function ProgrammesPage() {
               </option>
             ))}
           </select>
-          <button
-            type="submit"
-            className="rounded bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-700"
-          >
-            Add
-          </button>
+          <SubmitButton
+            label="Add"
+            className="rounded bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-400"
+          />
         </form>
       </section>
 
