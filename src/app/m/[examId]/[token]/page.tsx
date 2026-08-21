@@ -296,7 +296,7 @@ export default async function MarkerByTokenPage({
                 disabled={!canComplete}
                 className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
               >
-                Final marking complete
+                Submit final marks
               </button>
               <p className="mt-2 text-xs text-slate-500">
                 Marks all discrepancies as resolved and returns the exam to
