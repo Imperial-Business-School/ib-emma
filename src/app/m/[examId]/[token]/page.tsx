@@ -140,6 +140,14 @@ export default async function MarkerByTokenPage({
     (isPrimary && isPrimaryMarkingPhase(exam.status)) ||
     (isSecondary && isSecondaryMarkingPhase(exam.status));
 
+  // True once the marker has clicked "Submit marks" for their phase.
+  // Used to swap the neutral info box for a prominent success banner
+  // and to suppress the (now-irrelevant) deadline reminder.
+  const marksSubmitted =
+    !isResolving &&
+    ((isPrimary && exam.primary_completed_at != null) ||
+      (isSecondary && exam.secondary_completed_at != null));
+
   const myDeadline =
     isPrimary && exam.primary_deadline_date
       ? exam.primary_deadline_date
@@ -184,7 +192,7 @@ export default async function MarkerByTokenPage({
             {isSecondary ? "sampled seats" : "seats"} graded.
           </p>
         )}
-        {myDeadline && !isResolving && (
+        {myDeadline && !isResolving && !marksSubmitted && (
           <div
             className={`mt-4 rounded-lg border px-4 py-3 text-sm ${
               showLateBanner
@@ -209,16 +217,33 @@ export default async function MarkerByTokenPage({
         )}
       </div>
 
-      {!markingOpen && (
+      {marksSubmitted && (
+        <div className="rounded-lg border-2 border-green-300 bg-green-50 px-6 py-4">
+          <div className="flex items-start gap-3">
+            <span className="text-2xl leading-none text-green-700">✓</span>
+            <div>
+              <h2 className="text-lg font-bold text-green-900">
+                Your marks have been submitted
+              </h2>
+              <p className="mt-1 text-sm text-green-800">
+                {isPrimary
+                  ? exam.status === "first_marking_review"
+                    ? "Thanks. The admin is now reviewing the second-marking sample."
+                    : isSecondaryMarkingPhase(exam.status)
+                      ? "Thanks. The second marker is now reviewing a sample of your grades."
+                      : "Thanks. This exam is now complete."
+                  : exam.status === "review"
+                    ? "Thanks. The primary marker is reviewing any discrepancies between your grades and theirs."
+                    : "Thanks. This exam is now complete."}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+      {!markingOpen && !marksSubmitted && (
         <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
           {isPrimary && exam.status === "setup" && (
             <>The admin hasn&apos;t started marking yet.</>
-          )}
-          {isPrimary && exam.status === "first_marking_review" && (
-            <>You have completed your marking. The admin is reviewing the second-marking sample.</>
-          )}
-          {isPrimary && exam.status === "secondary_marking" && (
-            <>You have completed your marking. The second marker is now reviewing a sample.</>
           )}
           {isSecondary &&
             (exam.status === "setup" ||
@@ -226,9 +251,6 @@ export default async function MarkerByTokenPage({
               exam.status === "first_marking_review") && (
               <>The primary marker is still working, or the admin is reviewing the sample. You&apos;ll be notified when it&apos;s your turn.</>
             )}
-          {exam.status === "review" && isSecondary && (
-            <>Your marking is complete. The primary marker is reviewing discrepancies.</>
-          )}
           {exam.status === "complete" && (
             <>This exam is closed for marker edits.</>
           )}
@@ -293,7 +315,7 @@ export default async function MarkerByTokenPage({
                 disabled={!canComplete}
                 className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
               >
-                Marking is complete
+                Submit marks
               </button>
               <p className="mt-2 text-xs text-slate-500">
                 Locks in your grades and hands over to the admin to review the
@@ -312,7 +334,7 @@ export default async function MarkerByTokenPage({
                 disabled={!canComplete}
                 className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
               >
-                Marking is complete
+                Submit marks
               </button>
               <p className="mt-2 text-xs text-slate-500">
                 Locks in your grades. The primary marker will be asked to
