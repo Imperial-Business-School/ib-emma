@@ -21,7 +21,6 @@ import {
   setMcqScoreActionState,
   startPrimaryMarkingAction,
   startSecondaryMarkingAction,
-  toggleInSampleAction,
   updateMcqWeightingAction,
   updatePrimaryDeadlineActionState,
   updateSecondaryDeadlineActionState,
@@ -30,6 +29,7 @@ import { AbsenceToggleButton } from "./AbsenceToggleButton";
 import { DeadlineForm } from "./DeadlineForm";
 import { InlineSaveForm } from "./InlineSaveForm";
 import { ResetSeatsForm } from "./ResetSeatsForm";
+import { SampleToggle } from "./SampleToggle";
 import { SeatUploadForm } from "./SeatUploadForm";
 import { computeWeightedGrade } from "@/lib/weighted";
 import {
@@ -431,7 +431,7 @@ export default async function AdminExamPage({
             Markers never see the CID column.{" "}
             {isFirstMarkingReview
               ? "Click the star to toggle whether a seat is in the second-marking sample."
-              : "★ marks rows in the second-marking sample."}
+              : "A tick marks rows in the second-marking sample."}
           </p>
         </div>
         <table className="w-full text-sm">
@@ -600,33 +600,21 @@ export default async function AdminExamPage({
                   </td>
                   <td className="px-4 py-2 text-center">
                     {isFirstMarkingReview ? (
-                      <form
-                        action={async () => {
-                          "use server";
-                          await toggleInSampleAction(exam.id, s.id);
-                        }}
-                      >
-                        <button
-                          type="submit"
-                          aria-label={
-                            s.in_sample
-                              ? "Remove from sample"
-                              : "Add to sample"
-                          }
-                          className="cursor-pointer text-lg leading-none hover:opacity-70"
-                          title={
-                            s.in_sample
-                              ? "Click to remove from sample"
-                              : "Click to add to sample"
-                          }
-                        >
-                          {s.in_sample ? "★" : "☆"}
-                        </button>
-                      </form>
-                    ) : s.in_sample ? (
-                      <span title="In sample">★</span>
+                      <SampleToggle
+                        examId={exam.id}
+                        submissionId={s.id}
+                        initialChecked={s.in_sample}
+                      />
                     ) : (
-                      <span className="text-slate-300">☆</span>
+                      <input
+                        type="checkbox"
+                        checked={s.in_sample}
+                        disabled
+                        readOnly
+                        aria-label={s.in_sample ? "In sample" : "Not in sample"}
+                        title={s.in_sample ? "In sample" : "Not in sample"}
+                        className="h-4 w-4 accent-blue-600"
+                      />
                     )}
                   </td>
                   <td className="px-4 py-2">
