@@ -208,7 +208,8 @@ export default async function AdminExamPage({
           <p className="mt-1 text-sm text-purple-800">
             {sampleCount} of {totalSeats} seats are currently selected for
             second marking. Tick or untick the checkbox on any row below to
-            add or remove a seat. When you&apos;re happy, click{" "}
+            add or remove a seat. Check the second marker deadline and update
+            if required. When you&apos;re happy, click{" "}
             <em>Start second marking</em>.
           </p>
           <form
@@ -225,6 +226,7 @@ export default async function AdminExamPage({
               <input
                 type="date"
                 name="secondary_deadline"
+                defaultValue={exam.secondary_deadline_date ?? ""}
                 min={todayUkIsoDate()}
                 required
                 className="mt-1 rounded border px-2 py-1 text-sm"
