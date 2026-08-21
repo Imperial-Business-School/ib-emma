@@ -16,6 +16,7 @@ import {
 import { GradeTable, type GradeRow } from "./GradeTable";
 import { MarkerUploadPanel } from "./MarkerUploadPanel";
 import { QuickEntryForm } from "./QuickEntryForm";
+import { SubmitButton } from "./SubmitButton";
 
 export const dynamic = "force-dynamic";
 
@@ -291,13 +292,11 @@ export default async function MarkerByTokenPage({
                 await completeFinalMarkingByTokenAction(examId, token);
               }}
             >
-              <button
-                type="submit"
+              <SubmitButton
+                label="Submit final marks"
                 disabled={!canComplete}
                 className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
-              >
-                Submit final marks
-              </button>
+              />
               <p className="mt-2 text-xs text-slate-500">
                 Marks all discrepancies as resolved and returns the exam to
                 Ready for Canvas upload.
@@ -310,13 +309,11 @@ export default async function MarkerByTokenPage({
                 await completePrimaryMarkingByTokenAction(examId, token);
               }}
             >
-              <button
-                type="submit"
+              <SubmitButton
+                label="Submit marks"
                 disabled={!canComplete}
                 className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
-              >
-                Submit marks
-              </button>
+              />
               <p className="mt-2 text-xs text-slate-500">
                 Locks in your grades and hands over to the admin to review the
                 second-marking sample before the second marker is notified.
@@ -329,13 +326,11 @@ export default async function MarkerByTokenPage({
                 await completeSecondaryMarkingByTokenAction(examId, token);
               }}
             >
-              <button
-                type="submit"
+              <SubmitButton
+                label="Submit marks"
                 disabled={!canComplete}
                 className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
-              >
-                Submit marks
-              </button>
+              />
               <p className="mt-2 text-xs text-slate-500">
                 Locks in your grades. The primary marker will be asked to
                 resolve any discrepancies.
