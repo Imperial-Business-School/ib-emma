@@ -36,6 +36,14 @@ export function McqUploadPanel({ examId }: { examId: number }) {
         Upload MCQ scores as CSV with headers <code>CID</code>,{" "}
         <code>Seat</code>, <code>MCQ score</code>.
       </p>
+      <p className="mt-2">
+        <a
+          href={`/api/exams/${examId}/mcq-template.csv`}
+          className="text-xs text-blue-600 hover:underline"
+        >
+          Download blank template CSV
+        </a>
+      </p>
       <form
         onSubmit={onSubmit}
         className="mt-2 flex flex-wrap items-center gap-3"
