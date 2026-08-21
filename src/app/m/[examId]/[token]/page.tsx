@@ -135,19 +135,22 @@ export default async function MarkerByTokenPage({
   const actingAdmin = await getActingAdmin();
   const isAdminOverride = actingAdmin != null;
 
-  const markingOpen =
-    isAdminOverride ||
-    isResolving ||
-    (isPrimary && isPrimaryMarkingPhase(exam.status)) ||
-    (isSecondary && isSecondaryMarkingPhase(exam.status));
-
   // True once the marker has clicked "Submit marks" for their phase.
-  // Used to swap the neutral info box for a prominent success banner
-  // and to suppress the (now-irrelevant) deadline reminder.
+  // Used to swap the neutral info box for a prominent success banner,
+  // suppress the (now-irrelevant) deadline reminder, and freeze the
+  // marker view — even an admin acting via the marker URL cannot edit
+  // once the marker has submitted; overrides go through /admin/exams/.
   const marksSubmitted =
     !isResolving &&
     ((isPrimary && exam.primary_completed_at != null) ||
       (isSecondary && exam.secondary_completed_at != null));
+
+  const markingOpen =
+    !marksSubmitted &&
+    (isAdminOverride ||
+      isResolving ||
+      (isPrimary && isPrimaryMarkingPhase(exam.status)) ||
+      (isSecondary && isSecondaryMarkingPhase(exam.status)));
 
   const myDeadline =
     isPrimary && exam.primary_deadline_date
