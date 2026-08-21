@@ -31,13 +31,13 @@ export async function GET(
     role === "secondary"
       ? await query<{ seat_number: string }>(
           `SELECT seat_number FROM submissions
-           WHERE exam_id = $1 AND in_sample = true
+           WHERE exam_id = $1 AND in_sample = true AND absent = false
            ORDER BY ${SEAT_ORDER_ASC}`,
           [examId],
         )
       : await query<{ seat_number: string }>(
           `SELECT seat_number FROM submissions
-           WHERE exam_id = $1
+           WHERE exam_id = $1 AND absent = false
            ORDER BY ${SEAT_ORDER_ASC}`,
           [examId],
         );
