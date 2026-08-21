@@ -77,7 +77,7 @@ export function MarkerUploadPanel({
       </p>
       <div className="mt-3 flex flex-wrap items-center gap-3">
         <a
-          href={`/api/exams/${examId}/grades-template.csv`}
+          href={`/api/m/${examId}/${token}/grades-template.csv`}
           className="text-xs text-blue-600 hover:underline"
         >
           Download blank template CSV

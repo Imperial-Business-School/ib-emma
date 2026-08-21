@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { queryOne, type Exam } from "@/lib/db";
+import { query, queryOne, type Exam } from "@/lib/db";
 import { toCsv } from "@/lib/csv";
+import { SEAT_ORDER_ASC } from "@/lib/seatSort";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +17,21 @@ export async function GET(
       ])
     : null;
 
-  const body = toCsv([["CID", "Seat number", "MCQ score"]]) + "\n";
+  const seats = Number.isFinite(examId)
+    ? await query<{ cid: string; seat_number: string }>(
+        `SELECT cid, seat_number FROM submissions
+         WHERE exam_id = $1
+         ORDER BY ${SEAT_ORDER_ASC}`,
+        [examId],
+      )
+    : [];
+
+  const header: string[] = ["CID", "Seat number", "MCQ score"];
+  const rows: string[][] = [
+    header,
+    ...seats.map((s) => [s.cid, s.seat_number, ""]),
+  ];
+  const body = toCsv(rows) + "\n";
   const safe = (exam?.code || exam?.name || "mcq")
     .replace(/[^a-z0-9\-_]+/gi, "_")
     .slice(0, 60);
