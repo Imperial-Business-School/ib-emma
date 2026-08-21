@@ -212,6 +212,11 @@ export function GradeTable({
 
   const showPrimary = isSecondary || isResolving;
   const showSecondary = isResolving;
+  // Secondary marker sees the MCQ column right after Seat (so they can
+  // read it before the primary's grade); every other view keeps MCQ
+  // between the primary/secondary columns and the marker's own grade.
+  const mcqBeforePrimary = mcqEnabled && isSecondary && !isResolving;
+  const mcqAfterPrimary = mcqEnabled && !mcqBeforePrimary;
   const yourLabel = isResolving
     ? "Final grade"
     : isSecondary
@@ -259,6 +264,14 @@ export function GradeTable({
               onClick={() => onSort("seat")}
               className="w-20"
             />
+            {mcqBeforePrimary && (
+              <SortableTh
+                label="MCQ score"
+                active={sort.key === "mcq"}
+                dir={sort.dir}
+                onClick={() => onSort("mcq")}
+              />
+            )}
             {showPrimary && (
               <SortableTh
                 label="Primary grade"
@@ -270,7 +283,7 @@ export function GradeTable({
             {isResolving && <th className="px-4 py-2">Primary comment</th>}
             {showSecondary && <th className="px-4 py-2">Secondary grade</th>}
             {isResolving && <th className="px-4 py-2">Secondary comment</th>}
-            {mcqEnabled && (
+            {mcqAfterPrimary && (
               <SortableTh
                 label="MCQ score"
                 active={sort.key === "mcq"}
@@ -324,6 +337,11 @@ export function GradeTable({
             return (
               <tr key={r.id} className="border-b last:border-b-0 align-top">
                 <td className="px-4 py-2 font-mono">{r.seat_number}</td>
+                {mcqBeforePrimary && (
+                  <td className="px-4 py-2 font-mono text-slate-700">
+                    {r.absent ? "—" : (r.mcq_score ?? "—")}
+                  </td>
+                )}
                 {showPrimary && (
                   <td className="px-4 py-2 font-mono text-slate-700">
                     {r.primary_grade ?? "—"}
@@ -344,7 +362,7 @@ export function GradeTable({
                     {r.secondary_comment ?? "—"}
                   </td>
                 )}
-                {mcqEnabled && (
+                {mcqAfterPrimary && (
                   <td className="px-4 py-2 font-mono text-slate-700">
                     {r.absent ? "—" : (r.mcq_score ?? "—")}
                   </td>
