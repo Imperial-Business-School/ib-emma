@@ -233,10 +233,22 @@ export async function setGradeBySeatByTokenAction(
     );
   }
 
-  const row = await queryOne<{ id: number; in_sample: boolean; absent: boolean }>(
+  let row = await queryOne<{ id: number; in_sample: boolean; absent: boolean }>(
     "SELECT id, in_sample, absent FROM submissions WHERE exam_id = $1 AND seat_number = $2",
     [examId, seat],
   );
+  // Fall back to a natural-number match so "01" finds "1" (and vice versa)
+  // when the typed value is all-digits and fits safely in bigint.
+  if (!row && /^[0-9]{1,18}$/.test(seat)) {
+    row = await queryOne<{ id: number; in_sample: boolean; absent: boolean }>(
+      `SELECT id, in_sample, absent FROM submissions
+       WHERE exam_id = $1
+         AND seat_number ~ '^[0-9]+$'
+         AND length(seat_number) <= 18
+         AND seat_number::bigint = $2::bigint`,
+      [examId, seat],
+    );
+  }
   if (!row) throw new Error(`Seat ${seat} not found for this exam`);
   if (row.absent) {
     throw new Error(`Seat ${seat} is marked absent; grade ignored`);
