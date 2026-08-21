@@ -12,10 +12,10 @@ import {
   completeFinalMarkingByTokenAction,
   completePrimaryMarkingByTokenAction,
   completeSecondaryMarkingByTokenAction,
-  setGradeBySeatByTokenAction,
 } from "./actions";
 import { GradeTable, type GradeRow } from "./GradeTable";
 import { MarkerUploadPanel } from "./MarkerUploadPanel";
+import { QuickEntryForm } from "./QuickEntryForm";
 
 export const dynamic = "force-dynamic";
 
@@ -242,41 +242,7 @@ export default async function MarkerByTokenPage({
             Type a seat number and grade, then press Enter. Grades must be a
             number with at most one decimal place (e.g. 70 or 70.5).
           </p>
-          <form
-            action={async (fd) => {
-              "use server";
-              await setGradeBySeatByTokenAction(examId, token, fd);
-            }}
-            className="mt-3 flex flex-wrap gap-2"
-          >
-            <input
-              name="seat"
-              placeholder="Seat"
-              required
-              autoFocus
-              className="w-32 rounded border px-3 py-2 text-sm font-mono"
-            />
-            <input
-              name="grade"
-              placeholder="Grade"
-              required
-              pattern="^\d+(\.\d)?$"
-              inputMode="decimal"
-              title="A number with at most one decimal place, e.g. 70 or 70.5"
-              className="w-32 rounded border px-3 py-2 text-sm"
-            />
-            <input
-              name="comment"
-              placeholder="Comment (optional)"
-              className="flex-1 min-w-48 rounded border px-3 py-2 text-sm"
-            />
-            <button
-              type="submit"
-              className="rounded bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-700"
-            >
-              Save
-            </button>
-          </form>
+          <QuickEntryForm examId={examId} token={token} />
         </section>
       )}
 

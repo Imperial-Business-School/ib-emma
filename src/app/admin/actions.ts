@@ -12,6 +12,7 @@ import {
   markerUrl,
   recordEmail,
 } from "@/lib/deadlines";
+import { type SaveState, toErrorState } from "@/lib/actionState";
 
 async function getOrigin(): Promise<string> {
   const h = await headers();
@@ -614,4 +615,37 @@ export async function regenerateMarkerTokenAction(
     examId,
   ]);
   revalidatePath(`/admin/exams/${examId}`);
+}
+
+// State-returning wrappers used by client components with useActionState.
+// They convert a thrown Error into { ok:false, error } so the caller can
+// render the message inline instead of crashing the page.
+
+export async function adminOverrideGradeActionState(
+  examId: number,
+  submissionId: number,
+  field: "grade" | "secondary_grade" | "final_grade" | "mcq_score",
+  _prev: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
+  try {
+    await adminOverrideGradeAction(examId, submissionId, field, formData);
+    return { ok: true, error: null };
+  } catch (e) {
+    return toErrorState(e);
+  }
+}
+
+export async function setMcqScoreActionState(
+  examId: number,
+  submissionId: number,
+  _prev: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
+  try {
+    await setMcqScoreAction(examId, submissionId, formData);
+    return { ok: true, error: null };
+  } catch (e) {
+    return toErrorState(e);
+  }
 }

@@ -9,6 +9,7 @@ import {
 import { computeFinalGrade } from "@/lib/finalGrade";
 import { computeSampleIdsForMode } from "@/lib/sampling";
 import { parseCsv as parseCsvText } from "@/lib/csv";
+import { type SaveState, toErrorState } from "@/lib/actionState";
 
 type MarkerRole = "primary" | "secondary";
 
@@ -528,4 +529,20 @@ export async function completeFinalMarkingByTokenAction(
   await query("UPDATE exams SET status = 'complete' WHERE id = $1", [examId]);
   revalidatePath(`/m/${examId}/${token}`);
   revalidatePath(`/admin/exams/${examId}`);
+}
+
+// State-returning wrapper for the marker Quick Entry form. Turns thrown
+// validation errors into an inline message the client can render.
+export async function setGradeBySeatByTokenActionState(
+  examId: number,
+  token: string,
+  _prev: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
+  try {
+    await setGradeBySeatByTokenAction(examId, token, formData);
+    return { ok: true, error: null };
+  } catch (e) {
+    return toErrorState(e);
+  }
 }

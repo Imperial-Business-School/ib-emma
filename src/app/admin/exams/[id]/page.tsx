@@ -13,12 +13,12 @@ import { STATUS_BADGE_CLASS } from "@/lib/examStatus";
 import { sweepDeadlineStatuses } from "@/lib/deadlines";
 import {
   addSeatAction,
-  adminOverrideGradeAction,
+  adminOverrideGradeActionState,
   deleteSeatAction,
   reassignMarkerAction,
   regenerateMarkerTokenAction,
   resetSeatsAction,
-  setMcqScoreAction,
+  setMcqScoreActionState,
   startPrimaryMarkingAction,
   startSecondaryMarkingAction,
   toggleInSampleAction,
@@ -27,6 +27,7 @@ import {
   uploadSeatsAction,
 } from "../../actions";
 import { AbsenceToggleButton } from "./AbsenceToggleButton";
+import { InlineSaveForm } from "./InlineSaveForm";
 import { ResetSeatsForm } from "./ResetSeatsForm";
 import { computeWeightedGrade } from "@/lib/weighted";
 import {
@@ -595,29 +596,18 @@ export default async function AdminExamPage({
                       {s.absent ? (
                         <span className="text-slate-400">n/a</span>
                       ) : (
-                        <form
-                          action={async (fd) => {
-                            "use server";
-                            await setMcqScoreAction(exam.id, s.id, fd);
-                          }}
-                          className="flex gap-1"
-                        >
-                          <input
-                            name="mcq_score"
-                            defaultValue={s.mcq_score ?? ""}
-                            placeholder="—"
-                            pattern="^\d+(\.\d{1,2})?$"
-                            inputMode="decimal"
-                            title="Number with up to 2 decimal places"
-                            className="w-20 rounded border px-2 py-1 text-sm"
-                          />
-                          <button
-                            type="submit"
-                            className="rounded border bg-white px-2 py-1 text-xs hover:bg-slate-50"
-                          >
-                            Save
-                          </button>
-                        </form>
+                        <InlineSaveForm
+                          action={setMcqScoreActionState.bind(
+                            null,
+                            exam.id,
+                            s.id,
+                          )}
+                          defaultValue={s.mcq_score ?? ""}
+                          name="mcq_score"
+                          pattern="^\d+(\.\d{1,2})?$"
+                          inputMode="decimal"
+                          title="Number with up to 2 decimal places"
+                        />
                       )}
                     </td>
                   )}
@@ -625,37 +615,21 @@ export default async function AdminExamPage({
                     {s.absent ? (
                       <span className="text-slate-400">—</span>
                     ) : (
-                      <form
-                        action={async (fd) => {
-                          "use server";
-                          await adminOverrideGradeAction(
-                            exam.id,
-                            s.id,
-                            "grade",
-                            fd,
-                          );
-                        }}
-                        className="flex gap-1"
+                      <InlineSaveForm
+                        action={adminOverrideGradeActionState.bind(
+                          null,
+                          exam.id,
+                          s.id,
+                          "grade",
+                        )}
+                        defaultValue={s.grade ?? ""}
+                        pattern="^\d+(\.\d{1,2})?$"
+                        inputMode="decimal"
                         title={
                           s.override_note ??
                           "Admin override — type a new grade and save"
                         }
-                      >
-                        <input
-                          name="value"
-                          defaultValue={s.grade ?? ""}
-                          placeholder="—"
-                          pattern="^\d+(\.\d{1,2})?$"
-                          inputMode="decimal"
-                          className="w-20 rounded border px-2 py-1 text-sm"
-                        />
-                        <button
-                          type="submit"
-                          className="rounded border bg-white px-2 py-1 text-xs hover:bg-slate-50"
-                        >
-                          Save
-                        </button>
-                      </form>
+                      />
                     )}
                   </td>
                   <td className="px-4 py-2 text-slate-700">
@@ -696,37 +670,21 @@ export default async function AdminExamPage({
                     {s.absent ? (
                       <span className="text-slate-400">—</span>
                     ) : (
-                      <form
-                        action={async (fd) => {
-                          "use server";
-                          await adminOverrideGradeAction(
-                            exam.id,
-                            s.id,
-                            "secondary_grade",
-                            fd,
-                          );
-                        }}
-                        className="flex gap-1"
+                      <InlineSaveForm
+                        action={adminOverrideGradeActionState.bind(
+                          null,
+                          exam.id,
+                          s.id,
+                          "secondary_grade",
+                        )}
+                        defaultValue={s.secondary_grade ?? ""}
+                        pattern="^\d+(\.\d{1,2})?$"
+                        inputMode="decimal"
                         title={
                           s.override_note ??
                           "Admin override — type a new grade and save"
                         }
-                      >
-                        <input
-                          name="value"
-                          defaultValue={s.secondary_grade ?? ""}
-                          placeholder="—"
-                          pattern="^\d+(\.\d{1,2})?$"
-                          inputMode="decimal"
-                          className="w-20 rounded border px-2 py-1 text-sm"
-                        />
-                        <button
-                          type="submit"
-                          className="rounded border bg-white px-2 py-1 text-xs hover:bg-slate-50"
-                        >
-                          Save
-                        </button>
-                      </form>
+                      />
                     )}
                   </td>
                   <td className="px-4 py-2 text-slate-700">
@@ -743,39 +701,25 @@ export default async function AdminExamPage({
                       {s.absent ? (
                         <span className="text-slate-400">—</span>
                       ) : (
-                        <form
-                          action={async (fd) => {
-                            "use server";
-                            await adminOverrideGradeAction(
-                              exam.id,
-                              s.id,
-                              "final_grade",
-                              fd,
-                            );
-                          }}
-                          className="flex gap-1"
+                        <InlineSaveForm
+                          action={adminOverrideGradeActionState.bind(
+                            null,
+                            exam.id,
+                            s.id,
+                            "final_grade",
+                          )}
+                          defaultValue={s.final_grade ?? ""}
+                          placeholder={needsResolution ? "resolve" : "—"}
+                          pattern="^\d+(\.\d{1,2})?$"
+                          inputMode="decimal"
                           title={
                             needsResolution
                               ? "Awaiting primary marker resolution — admin can also enter a final grade here"
                               : (s.override_note ??
                                 "Admin override — type a new grade and save")
                           }
-                        >
-                          <input
-                            name="value"
-                            defaultValue={s.final_grade ?? ""}
-                            placeholder={needsResolution ? "resolve" : "—"}
-                            pattern="^\d+(\.\d{1,2})?$"
-                            inputMode="decimal"
-                            className={`w-20 rounded border px-2 py-1 text-sm ${needsResolution ? "border-amber-400" : ""}`}
-                          />
-                          <button
-                            type="submit"
-                            className="rounded border bg-white px-2 py-1 text-xs hover:bg-slate-50"
-                          >
-                            Save
-                          </button>
-                        </form>
+                          inputClassName={`w-20 rounded border px-2 py-1 text-sm ${needsResolution ? "border-amber-400" : ""}`}
+                        />
                       )}
                     </td>
                   )}
