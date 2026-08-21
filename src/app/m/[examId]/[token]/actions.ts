@@ -264,15 +264,31 @@ export async function setGradeBySeatByTokenAction(
 }
 
 // CSV upload for markers. Expected headers: Seat number, Grade, Comments.
-// Absent seats are silently ignored; other rows continue to save. Returns
-// a summary suitable to render on the marker page.
+//
+// Semantics are patch, not full-replace: a blank Grade cell leaves the
+// existing grade alone, a blank Comments cell leaves the existing
+// comment alone. This lets a marker upload a grades-only CSV without
+// wiping comments they typed on the page, and vice versa.
+//
+// Seat lookup is natural-number tolerant so "01" in the CSV finds the
+// seat stored as "1" (and vice versa). Rows for absent students are
+// silently ignored; everything else that can't be applied lands in
+// `skipped` for the user to review.
 export async function uploadGradesCsvByTokenAction(
   examId: number,
   token: string,
   formData: FormData,
 ): Promise<{ saved: number; ignoredAbsent: number; skipped: string[] }> {
   const { exam, role } = await authorize(examId, token);
-  if (!isInMarkerPhase(role, exam.status)) {
+  const isPrimary = role === "primary";
+
+  const { getActingAdmin } = await import("@/lib/actor");
+  const actingAdmin = await getActingAdmin();
+  const isAdminOverride = actingAdmin != null;
+
+  const inMarkingPhase = isInMarkerPhase(role, exam.status);
+  const inResolutionPhase = isPrimary && exam.status === "review";
+  if (!isAdminOverride && !inMarkingPhase && !inResolutionPhase) {
     throw new Error("Marking is not currently open for you on this exam");
   }
 
@@ -302,31 +318,55 @@ export async function uploadGradesCsvByTokenAction(
     if (c >= 0) commentIdx = c;
   }
 
-  // Pull all seats for this exam once. For secondary role, restrict to
-  // sampled seats. Skip absent seats from the writeable set entirely.
   const allRows = await query<{
     id: number;
     seat_number: string;
     in_sample: boolean;
     absent: boolean;
+    grade: string | null;
+    secondary_grade: string | null;
+    secondary_comment: string | null;
   }>(
-    "SELECT id, seat_number, in_sample, absent FROM submissions WHERE exam_id = $1",
+    `SELECT id, seat_number, in_sample, absent, grade, secondary_grade,
+            secondary_comment
+     FROM submissions WHERE exam_id = $1`,
     [examId],
   );
-  const bySeat = new Map(allRows.map((r) => [r.seat_number, r]));
 
-  const updates: { id: number; grade: string; comment: string | null }[] = [];
+  // Two indexes so "01" in the CSV finds a DB seat stored as "1"
+  // (and vice versa) without treating different non-numeric seats as
+  // equivalent.
+  const canonical = (s: string): string | null =>
+    /^[0-9]+$/.test(s) ? s.replace(/^0+(?=\d)/, "") : null;
+  const bySeat = new Map(allRows.map((r) => [r.seat_number, r]));
+  const byNumericSeat = new Map<string, (typeof allRows)[number]>();
+  for (const r of allRows) {
+    const key = canonical(r.seat_number);
+    if (key !== null) byNumericSeat.set(key, r);
+  }
+  const resolveSeat = (input: string) => {
+    const exact = bySeat.get(input);
+    if (exact) return exact;
+    const key = canonical(input);
+    return key === null ? undefined : byNumericSeat.get(key);
+  };
+
   const skipped: string[] = [];
   let ignoredAbsent = 0;
+  let saved = 0;
+  const overriddenIds: number[] = [];
 
   for (let i = start; i < rows.length; i++) {
     const r = rows[i];
     const seat = (r[seatIdx] ?? "").trim();
     if (!seat) continue;
     const gradeCell = (r[gradeIdx] ?? "").trim();
-    const commentCell = (r[commentIdx] ?? "").trim() || null;
+    const commentCell = (r[commentIdx] ?? "").trim();
+    const hasGrade = gradeCell !== "";
+    const hasComment = commentCell !== "";
+    if (!hasGrade && !hasComment) continue;
 
-    const row = bySeat.get(seat);
+    const row = resolveSeat(seat);
     if (!row) {
       skipped.push(`Seat ${seat}: not in exam`);
       continue;
@@ -335,23 +375,103 @@ export async function uploadGradesCsvByTokenAction(
       ignoredAbsent++;
       continue;
     }
-    if (role === "secondary" && !row.in_sample) {
+    if (role === "secondary" && !row.in_sample && !isAdminOverride) {
       skipped.push(`Seat ${seat}: not in second-marking sample`);
       continue;
     }
-    if (gradeCell !== "" && !isValidGrade(gradeCell)) {
+    if (hasGrade && !isValidGrade(gradeCell)) {
       skipped.push(
         `Seat ${seat}: grade "${gradeCell}" must be a number with at most one decimal place`,
       );
       continue;
     }
-    updates.push({ id: row.id, grade: gradeCell, comment: commentCell });
+    if (inResolutionPhase) {
+      if (!row.in_sample || row.grade === row.secondary_grade) {
+        skipped.push(`Seat ${seat}: not a discrepancy that needs review`);
+        continue;
+      }
+    }
+    // Secondary marker giving a grade that differs from primary must
+    // provide a comment. Under patch semantics the resulting comment is
+    // the new one if supplied, else the existing one on the row.
+    if (
+      role === "secondary" &&
+      !inResolutionPhase &&
+      !isAdminOverride &&
+      hasGrade &&
+      row.grade != null &&
+      gradeCell !== row.grade
+    ) {
+      const effective = hasComment
+        ? commentCell
+        : (row.secondary_comment ?? "");
+      if (effective.trim() === "") {
+        skipped.push(
+          `Seat ${seat}: your grade differs from the primary marker's, please add a comment before saving.`,
+        );
+        continue;
+      }
+    }
+
+    const setParts: string[] = [];
+    const params: (string | number)[] = [];
+    let idx = 1;
+    if (inResolutionPhase) {
+      if (hasGrade) {
+        setParts.push(`final_grade = $${idx++}`);
+        params.push(gradeCell);
+        setParts.push(`final_graded_at = now()`);
+      }
+      if (hasComment) {
+        setParts.push(`final_comment = $${idx++}`);
+        params.push(commentCell);
+      }
+    } else if (isPrimary) {
+      if (hasGrade) {
+        setParts.push(`grade = $${idx++}`);
+        params.push(gradeCell);
+        setParts.push(`graded_at = now()`);
+      }
+      if (hasComment) {
+        setParts.push(`primary_comment = $${idx++}`);
+        params.push(commentCell);
+      }
+    } else {
+      if (hasGrade) {
+        setParts.push(`secondary_grade = $${idx++}`);
+        params.push(gradeCell);
+        setParts.push(`secondary_graded_at = now()`);
+      }
+      if (hasComment) {
+        setParts.push(`secondary_comment = $${idx++}`);
+        params.push(commentCell);
+      }
+    }
+    if (setParts.length === 0) continue;
+    params.push(row.id);
+    await query(
+      `UPDATE submissions SET ${setParts.join(", ")} WHERE id = $${idx}`,
+      params,
+    );
+    saved++;
+    if (isAdminOverride) overriddenIds.push(row.id);
   }
 
-  if (updates.length > 0) {
-    await saveGradesByTokenAction(examId, token, updates);
+  if (isAdminOverride && actingAdmin && overriddenIds.length > 0) {
+    const ts = new Date().toISOString();
+    const note = `Grade was changed by Admin user ${actingAdmin.name} on ${ts} (via marker page ${role} CSV upload)`;
+    for (const id of overriddenIds) {
+      await query(
+        `UPDATE submissions
+         SET override_note = COALESCE(override_note || E'\\n', '') || $1
+         WHERE id = $2`,
+        [note, id],
+      );
+    }
   }
-  return { saved: updates.length, ignoredAbsent, skipped };
+
+  revalidatePath(`/m/${examId}/${token}`);
+  return { saved, ignoredAbsent, skipped };
 }
 
 // Clear every grade + comment written by the current marker for this exam.

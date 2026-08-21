@@ -24,11 +24,11 @@ import {
   toggleInSampleAction,
   updateMcqWeightingAction,
   updatePrimaryDeadlineAction,
-  uploadSeatsAction,
 } from "../../actions";
 import { AbsenceToggleButton } from "./AbsenceToggleButton";
 import { InlineSaveForm } from "./InlineSaveForm";
 import { ResetSeatsForm } from "./ResetSeatsForm";
+import { SeatUploadForm } from "./SeatUploadForm";
 import { computeWeightedGrade } from "@/lib/weighted";
 import {
   CID_ORDER_ASC,
@@ -339,27 +339,7 @@ export default async function AdminExamPage({
             </a>
             <ResetSeatsForm examId={exam.id} count={totalSeats} />
           </div>
-          <form
-            action={async (fd) => {
-              "use server";
-              await uploadSeatsAction(exam.id, fd);
-            }}
-            className="mt-3 flex items-center gap-3"
-          >
-            <input
-              type="file"
-              name="file"
-              accept=".csv,text/csv"
-              required
-              className="text-sm"
-            />
-            <button
-              type="submit"
-              className="rounded bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-700"
-            >
-              Upload
-            </button>
-          </form>
+          <SeatUploadForm examId={exam.id} />
 
           <form
             action={async (fd) => {

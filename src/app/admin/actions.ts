@@ -404,6 +404,19 @@ export async function uploadSeatsAction(examId: number, formData: FormData) {
   }
   if (entries.length === 0) throw new Error("No valid seat/CID rows found");
 
+  // Reject the whole upload if the CSV repeats a seat number or a CID.
+  const seenSeats = new Set<string>();
+  const seenCids = new Set<string>();
+  for (const { seat, cid } of entries) {
+    if (seenSeats.has(seat) || seenCids.has(cid)) {
+      throw new Error(
+        "CSV upload rejected. CSV contains duplicate entries. All CIDs and seat numbers must be unique.",
+      );
+    }
+    seenSeats.add(seat);
+    seenCids.add(cid);
+  }
+
   for (const { seat, cid } of entries) {
     await query(
       `INSERT INTO submissions (exam_id, seat_number, cid)
@@ -644,6 +657,19 @@ export async function setMcqScoreActionState(
 ): Promise<SaveState> {
   try {
     await setMcqScoreAction(examId, submissionId, formData);
+    return { ok: true, error: null };
+  } catch (e) {
+    return toErrorState(e);
+  }
+}
+
+export async function uploadSeatsActionState(
+  examId: number,
+  _prev: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
+  try {
+    await uploadSeatsAction(examId, formData);
     return { ok: true, error: null };
   } catch (e) {
     return toErrorState(e);
