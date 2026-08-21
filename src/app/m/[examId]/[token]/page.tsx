@@ -171,7 +171,22 @@ export default async function MarkerByTokenPage({
   const gradableRows = tableRows.filter((r) => !r.absent);
   const total = gradableRows.length;
   const graded = gradableRows.filter((r) => r.current_grade != null).length;
-  const canComplete = markingOpen && total > 0 && graded === total;
+  // Second marker: every seat where their grade differs from the
+  // primary marker's must carry a comment before they can submit.
+  const secondaryMismatchesMissingComment = isSecondary
+    ? gradableRows.filter(
+        (r) =>
+          r.current_grade != null &&
+          r.primary_grade != null &&
+          r.current_grade !== r.primary_grade &&
+          (r.current_comment ?? "").trim() === "",
+      ).length
+    : 0;
+  const canComplete =
+    markingOpen &&
+    total > 0 &&
+    graded === total &&
+    secondaryMismatchesMissingComment === 0;
 
   const headerText = isResolving
     ? "Discrepancies to review"
@@ -337,6 +352,15 @@ export default async function MarkerByTokenPage({
                 scrollToTop
                 className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
               />
+              {secondaryMismatchesMissingComment > 0 && (
+                <p className="mt-2 text-xs text-red-700">
+                  {secondaryMismatchesMissingComment} sampled seat
+                  {secondaryMismatchesMissingComment === 1 ? "" : "s"} have a
+                  grade that differs from the primary marker&apos;s but no
+                  comment. Add a comment on each — on the page or via a CSV
+                  upload — before submitting.
+                </p>
+              )}
               <p className="mt-2 text-xs text-slate-500">
                 Locks in your grades. The primary marker will be asked to
                 resolve any discrepancies.

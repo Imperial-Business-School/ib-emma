@@ -338,6 +338,16 @@ export function GradeTable({
               value !== (r.current_grade ?? "") ||
               comment !== (r.current_comment ?? "");
             const saving = pendingIds.has(r.id);
+            // Second marker must comment whenever their grade differs
+            // from the primary's; drives the red outline + placeholder
+            // on the comment input while they're still typing.
+            const commentRequired =
+              isSecondary &&
+              !isResolving &&
+              value.trim() !== "" &&
+              r.primary_grade != null &&
+              value !== r.primary_grade;
+            const commentMissing = commentRequired && comment.trim() === "";
             return (
               <tr key={r.id} className="border-b last:border-b-0 align-top">
                 <td className="px-4 py-2 font-mono">{r.seat_number}</td>
@@ -401,8 +411,19 @@ export function GradeTable({
                       onChange={(e) =>
                         setComments((p) => ({ ...p, [r.id]: e.target.value }))
                       }
-                      placeholder="optional"
-                      className={`w-full min-w-32 rounded border px-2 py-1 text-sm ${dirty ? "border-blue-400 bg-blue-50" : ""}`}
+                      placeholder={commentRequired ? "required" : "optional"}
+                      title={
+                        commentRequired
+                          ? "Your grade differs from the primary marker's — a comment is required."
+                          : undefined
+                      }
+                      className={`w-full min-w-32 rounded border px-2 py-1 text-sm ${
+                        commentMissing
+                          ? "border-red-400 bg-red-50"
+                          : dirty
+                            ? "border-blue-400 bg-blue-50"
+                            : ""
+                      }`}
                     />
                   ) : (
                     <span className="text-slate-700">{comment || "—"}</span>

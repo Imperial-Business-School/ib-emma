@@ -576,12 +576,29 @@ export async function completeSecondaryMarkingByTokenAction(
 
   const ungraded = await queryOne<{ n: number }>(
     `SELECT COUNT(*)::int AS n FROM submissions
-     WHERE exam_id = $1 AND in_sample = true AND secondary_grade IS NULL`,
+     WHERE exam_id = $1 AND in_sample = true AND absent = false
+       AND secondary_grade IS NULL`,
     [examId],
   );
   if (ungraded && ungraded.n > 0) {
     throw new Error(
       `${ungraded.n} sampled seat(s) still need a second-marker grade`,
+    );
+  }
+
+  // Every mismatched sampled seat must carry a comment explaining
+  // the discrepancy before the second marker can submit.
+  const missing = await queryOne<{ n: number }>(
+    `SELECT COUNT(*)::int AS n FROM submissions
+     WHERE exam_id = $1 AND in_sample = true AND absent = false
+       AND grade IS NOT NULL AND secondary_grade IS NOT NULL
+       AND grade <> secondary_grade
+       AND (secondary_comment IS NULL OR btrim(secondary_comment) = '')`,
+    [examId],
+  );
+  if (missing && missing.n > 0) {
+    throw new Error(
+      `${missing.n} sampled seat(s) have a grade that differs from the primary marker's but no comment. Add a comment explaining the discrepancy before submitting.`,
     );
   }
 
