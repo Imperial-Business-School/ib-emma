@@ -354,89 +354,47 @@ export default async function AdminExamPage({
         </div>
       </section>
 
-      {exam.status === "setup" && (
-        <section className="rounded-lg border bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold">Seats (seat → CID)</h2>
-          <p className="mt-1 text-sm text-slate-600">
-            Upload a two-column file (<code>Seat number</code>, <code>CID</code>)
-            using the template linked below. Alternatively, students can be
-            added individually.
-            <br />
-            <span className="mt-1 block">
-              Note: CIDs must start with a zero (i.e. 0123456, not 123456).
-            </span>
-          </p>
-          <div className="mt-2 flex flex-wrap items-center gap-3">
-            <a
-              href={`/api/exams/${exam.id}/seats-template.xlsx`}
-              className="text-xs text-blue-600 hover:underline"
-            >
-              Download blank template (Excel)
-            </a>
-            <ResetSeatsForm examId={exam.id} count={totalSeats} />
-          </div>
-          <SeatUploadForm examId={exam.id} />
-
-          <AddSeatForm examId={exam.id} />
-        </section>
-      )}
-
-      {exam.mcq_enabled && (
-        <section className="rounded-lg border bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold">MCQ element</h2>
-          <p className="mt-1 text-sm text-slate-600">
-            MCQ scores contribute to each student&apos;s weighted grade at
-            the configured weighting. Weighting can be updated at any time.
-          </p>
-          <form
-            action={async (fd) => {
-              "use server";
-              await updateMcqWeightingAction(exam.id, fd);
-            }}
-            className="mt-3 flex flex-wrap items-end gap-2"
-          >
-            <label className="text-sm">
-              <span className="block text-xs font-medium text-slate-600">
-                Weighting (%)
-              </span>
-              <input
-                name="mcq_weighting"
-                type="text"
-                defaultValue={exam.mcq_weighting ?? ""}
-                pattern="^\d+(\.\d{1,2})?$"
-                inputMode="decimal"
-                className="mt-1 w-40 rounded border px-3 py-2 text-sm"
-              />
-            </label>
-            <SubmitButton
-              label="Save weighting"
-              className="rounded bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-400"
-            />
-          </form>
-          {exam.status === "setup" && (
-            <div className="mt-4">
-              <McqUploadPanel examId={exam.id} />
-            </div>
-          )}
-        </section>
-      )}
-
       <section className="rounded-lg border bg-white shadow-sm">
-        <div className="border-b px-4 py-3">
-          <h2 className="text-lg font-semibold">
-            All seats ({totalSeats}) · primary {primaryGraded}/{totalSeats}
-            {sampleCount > 0 && (
-              <span className="text-slate-500">
-                {" "}
-                · secondary {secondaryGraded}/{sampleCount}
+        {exam.status === "setup" && (
+          <div className="border-b p-6">
+            <h2 className="text-lg font-semibold">Add Seats</h2>
+            <p className="mt-1 text-sm text-slate-600">
+              Upload a two-column file (<code>Seat number</code>,{" "}
+              <code>CID</code>) using the template linked below. Alternatively,
+              students can be added individually.
+              <br />
+              <span className="mt-1 block">
+                Note: CIDs must start with a zero (i.e. 0123456, not 123456).
               </span>
+            </p>
+            <div className="mt-2 flex flex-wrap items-center gap-3">
+              <a
+                href={`/api/exams/${exam.id}/seats-template.xlsx`}
+                className="text-xs text-blue-600 hover:underline"
+              >
+                Download blank template (Excel)
+              </a>
+              <ResetSeatsForm examId={exam.id} count={totalSeats} />
+            </div>
+            <SeatUploadForm examId={exam.id} />
+
+            <AddSeatForm examId={exam.id} />
+          </div>
+        )}
+        <div className="border-b px-4 py-3">
+          <h2 className="text-lg font-semibold">All Seats</h2>
+          <p className="mt-1 text-xs text-slate-500">
+            {totalSeats} total · primary {primaryGraded}/{totalSeats}
+            {sampleCount > 0 && (
+              <> · secondary {secondaryGraded}/{sampleCount}</>
             )}
-          </h2>
-          <p className="text-xs text-slate-500">
-            Markers never see the CID column.{" "}
-            {isFirstMarkingReview
-              ? "Click the star to toggle whether a seat is in the second-marking sample."
-              : "A tick marks rows in the second-marking sample."}
+            {isFirstMarkingReview && (
+              <>
+                {" "}
+                · Click the star to toggle whether a seat is in the
+                second-marking sample.
+              </>
+            )}
           </p>
         </div>
         <table className="w-full text-sm">
@@ -714,6 +672,46 @@ export default async function AdminExamPage({
           </tbody>
         </table>
       </section>
+
+      {exam.mcq_enabled && (
+        <section className="rounded-lg border bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-semibold">MCQ element</h2>
+          <p className="mt-1 text-sm text-slate-600">
+            MCQ scores contribute to each student&apos;s weighted grade at
+            the configured weighting. Weighting can be updated at any time.
+          </p>
+          <form
+            action={async (fd) => {
+              "use server";
+              await updateMcqWeightingAction(exam.id, fd);
+            }}
+            className="mt-3 flex flex-wrap items-end gap-2"
+          >
+            <label className="text-sm">
+              <span className="block text-xs font-medium text-slate-600">
+                Weighting (%)
+              </span>
+              <input
+                name="mcq_weighting"
+                type="text"
+                defaultValue={exam.mcq_weighting ?? ""}
+                pattern="^\d+(\.\d{1,2})?$"
+                inputMode="decimal"
+                className="mt-1 w-40 rounded border px-3 py-2 text-sm"
+              />
+            </label>
+            <SubmitButton
+              label="Save weighting"
+              className="rounded bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-400"
+            />
+          </form>
+          {exam.status === "setup" && (
+            <div className="mt-4">
+              <McqUploadPanel examId={exam.id} />
+            </div>
+          )}
+        </section>
+      )}
 
       {canStartMarking && (
         <section className="rounded-lg border bg-white p-6 shadow-sm">
