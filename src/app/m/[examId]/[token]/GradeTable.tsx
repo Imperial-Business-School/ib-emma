@@ -259,7 +259,8 @@ export function GradeTable({
             {total > 0 && graded === total ? " ✓" : ""}
           </p>
           <p className="mt-1 text-xs text-slate-500">
-            CIDs are hidden from markers. {yourCommentLabel} are optional.
+            CIDs are hidden from markers. {yourCommentLabel}{" "}
+            {isSecondary ? "are" : "is"} optional.
           </p>
         </div>
       </div>
