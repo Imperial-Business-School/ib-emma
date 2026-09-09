@@ -352,6 +352,26 @@ export default async function MarkerByTokenPage({
 
       {markingOpen && (
         <section className="rounded-lg border bg-white p-6 shadow-sm">
+          {!isResolving && (
+            <div className="mb-4 flex flex-wrap items-baseline gap-x-4 gap-y-1">
+              <p
+                className={`text-xl font-semibold ${
+                  total > 0 && graded === total
+                    ? "text-green-700"
+                    : "text-slate-800"
+                }`}
+              >
+                {graded} of {total}{" "}
+                {isSecondary ? "sampled seats graded" : "seats graded"}
+                {total > 0 && graded === total ? " ✓" : ""}
+              </p>
+              {graded < total && (
+                <p className="text-sm text-slate-600">
+                  You must grade every student before marks can be submitted.
+                </p>
+              )}
+            </div>
+          )}
           {isResolving ? (
             <CompleteMarkingButton
               action={completeFinalMarkingByTokenActionState.bind(
