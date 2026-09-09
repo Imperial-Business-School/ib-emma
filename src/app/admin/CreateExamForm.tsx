@@ -112,9 +112,13 @@ export function CreateExamForm({
         </span>
         <select
           name="academic_year"
-          defaultValue={defaultAcademicYear}
+          defaultValue=""
+          required
           className="mt-1 w-full rounded border bg-white px-3 py-2 text-sm"
         >
+          <option value="" disabled>
+            — Select an academic year —
+          </option>
           {academicYears.map((y) => (
             <option key={y} value={y}>
               20{y.split("/")[0]}/20{y.split("/")[1]} ({y})
