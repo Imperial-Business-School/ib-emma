@@ -218,7 +218,8 @@ export function CreateExamForm({
         />
         <input
           name="primary_name"
-          placeholder="Name (optional)"
+          required
+          placeholder="Full name"
           className="mt-2 w-full rounded border px-3 py-2 text-sm"
         />
       </div>
@@ -237,7 +238,8 @@ export function CreateExamForm({
         />
         <input
           name="secondary_name"
-          placeholder="Name (optional)"
+          required
+          placeholder="Full name"
           className="mt-2 w-full rounded border px-3 py-2 text-sm"
         />
         {emailsMatch && (

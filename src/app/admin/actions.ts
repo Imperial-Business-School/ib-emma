@@ -114,11 +114,11 @@ export async function createExamAction(formData: FormData) {
   }
 
   const primaryEmail = parseEmail(formData.get("primary_email"));
-  const primaryName =
-    String(formData.get("primary_name") ?? "").trim() || null;
+  const primaryName = String(formData.get("primary_name") ?? "").trim();
   const secondaryEmail = parseEmail(formData.get("secondary_email"));
-  const secondaryName =
-    String(formData.get("secondary_name") ?? "").trim() || null;
+  const secondaryName = String(formData.get("secondary_name") ?? "").trim();
+  if (!primaryName) throw new Error("Primary marker name is required");
+  if (!secondaryName) throw new Error("Second marker name is required");
 
   if (primaryEmail === secondaryEmail) {
     throw new Error(
