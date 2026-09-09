@@ -20,6 +20,7 @@ import {
   setMcqScoreActionState,
   startPrimaryMarkingAction,
   startSecondaryMarkingAction,
+  updateExamDateActionState,
   updateMcqWeightingAction,
   updatePrimaryDeadlineActionState,
   updateSecondaryDeadlineActionState,
@@ -286,9 +287,16 @@ export default async function AdminExamPage({
         <p className="text-xs font-semibold uppercase text-slate-500">
           Exam date
         </p>
-        <p className="mt-1 font-medium">
-          {exam.exam_date ? formatDateOnly(exam.exam_date) : "Not set"}
-        </p>
+        {exam.exam_date && (
+          <p className="mt-1 font-medium">{formatDateOnly(exam.exam_date)}</p>
+        )}
+        <DeadlineForm
+          action={updateExamDateActionState.bind(null, exam.id)}
+          name="exam_date"
+          defaultValue={exam.exam_date ?? ""}
+          helper="The date the exam is (or was) sat."
+          allowPast
+        />
       </section>
 
       <section className="grid gap-4 md:grid-cols-2">

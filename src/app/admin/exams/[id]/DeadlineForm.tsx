@@ -7,20 +7,23 @@ import {
 } from "@/lib/actionState";
 import { todayUkIsoDate } from "@/lib/datetime";
 
-// Inline deadline editor. The <input type="date"> enforces min=today
-// client-side; the server action enforces the same constraint again.
-// Errors from the server surface below the input rather than crashing
-// the page.
+// Inline date editor. The <input type="date"> enforces min=today
+// client-side by default; the server action enforces the same
+// constraint again. Errors from the server surface below the input
+// rather than crashing the page. Pass allowPast to accept dates in
+// the past (used for the exam date, which admins may backfill).
 export function DeadlineForm({
   action,
   name,
   defaultValue,
   helper,
+  allowPast = false,
 }: {
   action: (prev: SaveState, fd: FormData) => Promise<SaveState>;
   name: string;
   defaultValue: string;
   helper?: string;
+  allowPast?: boolean;
 }) {
   const [state, formAction, pending] = useActionState<SaveState, FormData>(
     action,
@@ -34,7 +37,7 @@ export function DeadlineForm({
           type="date"
           name={name}
           defaultValue={defaultValue}
-          min={today}
+          min={allowPast ? undefined : today}
           required
           className={`rounded border px-2 py-1 text-sm ${state.error ? "border-red-400" : ""}`}
         />

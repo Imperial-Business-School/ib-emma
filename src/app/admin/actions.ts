@@ -426,6 +426,23 @@ export async function updateSecondaryDeadlineAction(
   revalidatePath(`/admin/exams/${examId}`);
 }
 
+// Admin-editable exam date. Unlike the marking deadlines, this one
+// accepts past dates (an admin may be backfilling an exam that has
+// already been sat).
+export async function updateExamDateAction(
+  examId: number,
+  formData: FormData,
+) {
+  await requireAdmin();
+  const examDate = parseDeadline(formData.get("exam_date"));
+  if (!examDate) throw new Error("Exam date is required");
+  await query(
+    "UPDATE exams SET exam_date = $1 WHERE id = $2",
+    [examDate, examId],
+  );
+  revalidatePath(`/admin/exams/${examId}`);
+}
+
 export async function reassignMarkerAction(
   examId: number,
   role: "primary" | "secondary",
@@ -836,6 +853,20 @@ export async function updateSecondaryDeadlineActionState(
   await requireAdmin();
   try {
     await updateSecondaryDeadlineAction(examId, formData);
+    return { ok: true, error: null };
+  } catch (e) {
+    return toErrorState(e);
+  }
+}
+
+export async function updateExamDateActionState(
+  examId: number,
+  _prev: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
+  await requireAdmin();
+  try {
+    await updateExamDateAction(examId, formData);
     return { ok: true, error: null };
   } catch (e) {
     return toErrorState(e);
