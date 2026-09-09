@@ -143,7 +143,7 @@ export function CreateExamForm({
           type="date"
           name="exam_date"
           required
-          className="mt-1 w-full rounded border px-3 py-2 text-sm"
+          className="mt-1 w-48 rounded border px-3 py-2 text-sm"
         />
         <span className="mt-1 block text-xs text-slate-500">
           The date the exam is (or was) sat.
