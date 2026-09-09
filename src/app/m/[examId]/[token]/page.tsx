@@ -1,5 +1,11 @@
 import { notFound } from "next/navigation";
-import { query, queryOne, type Exam, type Submission } from "@/lib/db";
+import {
+  query,
+  queryOne,
+  type Exam,
+  type Programme,
+  type Submission,
+} from "@/lib/db";
 import { SEAT_ORDER_ASC } from "@/lib/seatSort";
 import {
   isPrimaryMarkingPhase,
@@ -43,6 +49,12 @@ export default async function MarkerByTokenPage({
   if (token && token === exam.primary_access_token) role = "primary";
   else if (token && token === exam.secondary_access_token) role = "secondary";
   else notFound();
+
+  const programme = exam.programme_id
+    ? ((await queryOne<Programme>("SELECT * FROM programmes WHERE id = $1", [
+        exam.programme_id,
+      ])) ?? null)
+    : null;
 
   const isPrimary = role === "primary";
   const isSecondary = role === "secondary";
@@ -190,8 +202,30 @@ export default async function MarkerByTokenPage({
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-bold">{exam.name}</h1>
-        {exam.code && <p className="text-sm text-slate-600">{exam.code}</p>}
+        <h1 className="text-2xl font-bold">
+          {exam.name}
+          {exam.exam_date && (
+            <span className="ml-2 text-base font-normal text-slate-500">
+              ({formatDateOnly(exam.exam_date)})
+            </span>
+          )}
+        </h1>
+        {(exam.module_name || exam.code) && (
+          <p className="text-sm text-slate-600">
+            {exam.module_name ?? "—"}
+            {exam.code && (
+              <span className="text-slate-500"> ({exam.code})</span>
+            )}
+          </p>
+        )}
+        {(programme || exam.academic_year) && (
+          <p className="text-sm text-slate-600">
+            {programme?.name ?? "—"}
+            {exam.academic_year && (
+              <span className="text-slate-500"> ({exam.academic_year})</span>
+            )}
+          </p>
+        )}
         {isResolving ? (
           <p className="mt-2 text-sm text-slate-600">
             <strong>Final marking.</strong> Review each discrepancy below
@@ -202,11 +236,6 @@ export default async function MarkerByTokenPage({
           <p className="mt-2 text-sm text-slate-600">
             You are the <strong>{headerText}</strong>. {graded} of {total}{" "}
             {isSecondary ? "sampled seats" : "seats"} graded.
-          </p>
-        )}
-        {exam.exam_date && (
-          <p className="mt-2 text-sm text-slate-600">
-            <strong>Exam date:</strong> {formatDateOnly(exam.exam_date)}
           </p>
         )}
         {myDeadline && !isResolving && !marksSubmitted && (

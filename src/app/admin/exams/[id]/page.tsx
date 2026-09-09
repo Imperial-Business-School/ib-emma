@@ -166,14 +166,31 @@ export default async function AdminExamPage({
           <Link href="/admin" className="text-sm text-blue-600 hover:underline">
             ← All exams
           </Link>
-          <h1 className="mt-1 text-2xl font-bold">{exam.name}</h1>
-          {exam.code && <p className="text-sm text-slate-600">{exam.code}</p>}
-          {programme && (
-            <p className="text-sm text-slate-600">
-              {programme.name}{" "}
-              <span className="text-slate-400">
-                ({programme.programme_id}, {programme.level})
+          <h1 className="mt-1 text-2xl font-bold">
+            {exam.name}
+            {exam.exam_date && (
+              <span className="ml-2 text-base font-normal text-slate-500">
+                ({formatDateOnly(exam.exam_date)})
               </span>
+            )}
+          </h1>
+          {(exam.module_name || exam.code) && (
+            <p className="text-sm text-slate-600">
+              {exam.module_name ?? "—"}
+              {exam.code && (
+                <span className="text-slate-500"> ({exam.code})</span>
+              )}
+            </p>
+          )}
+          {(programme || exam.academic_year) && (
+            <p className="text-sm text-slate-600">
+              {programme?.name ?? "—"}
+              {exam.academic_year && (
+                <span className="text-slate-500">
+                  {" "}
+                  ({exam.academic_year})
+                </span>
+              )}
             </p>
           )}
           <p className="mt-2 flex flex-wrap items-center gap-2">
