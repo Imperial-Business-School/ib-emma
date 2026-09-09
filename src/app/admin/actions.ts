@@ -63,9 +63,8 @@ function parseSamplingMode(v: FormDataEntryValue | null): "standard" | "full" {
 export async function createExamAction(formData: FormData) {
   await requireAdmin();
   const name = String(formData.get("name") ?? "").trim();
-  const code = String(formData.get("code") ?? "").trim() || null;
-  const moduleName =
-    String(formData.get("module_name") ?? "").trim() || null;
+  const code = String(formData.get("code") ?? "").trim();
+  const moduleName = String(formData.get("module_name") ?? "").trim();
   const academicYearRaw =
     String(formData.get("academic_year") ?? "").trim() || null;
   const academicYear =
@@ -105,6 +104,8 @@ export async function createExamAction(formData: FormData) {
     throw new Error("Academic year is required");
   }
   if (!name) throw new Error("Exam name is required");
+  if (!moduleName) throw new Error("Module name is required");
+  if (!code) throw new Error("Module code is required");
   if (!primaryDeadline) {
     throw new Error("Primary marker deadline is required");
   }

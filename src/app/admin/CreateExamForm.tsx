@@ -78,12 +78,14 @@ export function CreateExamForm({
       />
       <input
         name="module_name"
+        required
         placeholder="Module name (e.g. Analysis I)"
         className="rounded border px-3 py-2"
       />
       <input
         name="code"
-        placeholder="Module code (optional, e.g. MATH40001)"
+        required
+        placeholder="Module code (e.g. MATH40001)"
         className="rounded border px-3 py-2"
       />
       <label className="text-sm md:col-span-2">
