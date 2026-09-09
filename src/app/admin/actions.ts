@@ -130,6 +130,11 @@ export async function createExamAction(formData: FormData) {
       "Second marker deadline cannot be before the exam date",
     );
   }
+  if (secondaryDeadline < primaryDeadline) {
+    throw new Error(
+      "Second marker deadline cannot be before the first marker deadline",
+    );
+  }
 
   const primaryEmail = parseEmail(formData.get("primary_email"));
   const primaryName = String(formData.get("primary_name") ?? "").trim();
@@ -396,13 +401,27 @@ export async function updatePrimaryDeadlineAction(
     formData.get("primary_deadline"),
     "First marker deadline",
   );
-  const existing = await queryOne<{ exam_date: string | null }>(
-    "SELECT exam_date::text AS exam_date FROM exams WHERE id = $1",
+  const existing = await queryOne<{
+    exam_date: string | null;
+    secondary_deadline_date: string | null;
+  }>(
+    `SELECT exam_date::text              AS exam_date,
+            secondary_deadline_date::text AS secondary_deadline_date
+       FROM exams WHERE id = $1`,
     [examId],
   );
   if (deadline && existing?.exam_date && deadline < existing.exam_date) {
     throw new Error(
       "First marker deadline cannot be before the exam date",
+    );
+  }
+  if (
+    deadline &&
+    existing?.secondary_deadline_date &&
+    deadline > existing.secondary_deadline_date
+  ) {
+    throw new Error(
+      "First marker deadline cannot be after the second marker deadline",
     );
   }
   // Also snap status out of overdue/late so the sweep can re-diagnose
@@ -432,13 +451,27 @@ export async function updateSecondaryDeadlineAction(
     formData.get("secondary_deadline"),
     "Second marker deadline",
   );
-  const existing = await queryOne<{ exam_date: string | null }>(
-    "SELECT exam_date::text AS exam_date FROM exams WHERE id = $1",
+  const existing = await queryOne<{
+    exam_date: string | null;
+    primary_deadline_date: string | null;
+  }>(
+    `SELECT exam_date::text            AS exam_date,
+            primary_deadline_date::text AS primary_deadline_date
+       FROM exams WHERE id = $1`,
     [examId],
   );
   if (deadline && existing?.exam_date && deadline < existing.exam_date) {
     throw new Error(
       "Second marker deadline cannot be before the exam date",
+    );
+  }
+  if (
+    deadline &&
+    existing?.primary_deadline_date &&
+    deadline < existing.primary_deadline_date
+  ) {
+    throw new Error(
+      "Second marker deadline cannot be before the first marker deadline",
     );
   }
   await query(
@@ -782,6 +815,14 @@ export async function startSecondaryMarkingAction(
   if (exam.exam_date && secondaryDeadline < exam.exam_date) {
     throw new Error(
       "Second marker deadline cannot be before the exam date",
+    );
+  }
+  if (
+    exam.primary_deadline_date &&
+    secondaryDeadline < exam.primary_deadline_date
+  ) {
+    throw new Error(
+      "Second marker deadline cannot be before the first marker deadline",
     );
   }
   const sample = await queryOne<{ n: number }>(

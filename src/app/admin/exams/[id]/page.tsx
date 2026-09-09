@@ -322,8 +322,9 @@ export default async function AdminExamPage({
             action={updatePrimaryDeadlineActionState.bind(null, exam.id)}
             name="primary_deadline"
             defaultValue={exam.primary_deadline_date ?? ""}
-            helper="Deadline is 10:00 UK time on this date. Cannot be before the exam date."
+            helper="Deadline is 10:00 UK time on this date. Must be on or after the exam date and on or before the second marker deadline."
             minDate={exam.exam_date ?? undefined}
+            maxDate={exam.secondary_deadline_date ?? undefined}
           />
         </div>
         <div className="rounded-lg border bg-white p-4 shadow-sm">
@@ -339,8 +340,16 @@ export default async function AdminExamPage({
             action={updateSecondaryDeadlineActionState.bind(null, exam.id)}
             name="secondary_deadline"
             defaultValue={exam.secondary_deadline_date ?? ""}
-            helper="Deadline is 10:00 UK time on this date. Cannot be before the exam date."
-            minDate={exam.exam_date ?? undefined}
+            helper="Deadline is 10:00 UK time on this date. Must be on or after the first marker deadline (and the exam date)."
+            minDate={
+              exam.exam_date && exam.primary_deadline_date
+                ? exam.exam_date > exam.primary_deadline_date
+                  ? exam.exam_date
+                  : exam.primary_deadline_date
+                : (exam.primary_deadline_date ??
+                  exam.exam_date ??
+                  undefined)
+            }
           />
         </div>
       </section>
