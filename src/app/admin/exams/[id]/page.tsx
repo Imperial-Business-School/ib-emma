@@ -361,6 +361,10 @@ export default async function AdminExamPage({
             Upload a two-column CSV (<code>Seat number</code>, <code>CID</code>)
             using the template linked below. Alternatively, students can be
             added individually.
+            <br />
+            <span className="mt-1 block">
+              Note: CIDs must start with a zero (i.e. 0123456, not 123456).
+            </span>
           </p>
           <div className="mt-2 flex flex-wrap items-center gap-3">
             <a
