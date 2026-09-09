@@ -1,7 +1,7 @@
 "use server";
 
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { getRequestOrigin } from "@/lib/origin";
 import { revalidatePath } from "next/cache";
 import { findOrCreateUser } from "@/lib/auth";
 import { query, queryOne, randomToken, type Exam } from "@/lib/db";
@@ -15,12 +15,6 @@ import {
 import { type SaveState, toErrorState } from "@/lib/actionState";
 import { requireAdmin } from "@/lib/actor";
 
-async function getOrigin(): Promise<string> {
-  const h = await headers();
-  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000";
-  const proto = h.get("x-forwarded-proto") ?? "https";
-  return `${proto}://${host}`;
-}
 
 // Deadlines are now stored as a bare 'YYYY-MM-DD' UK date. Overdue
 // detection treats the deadline as passed once local UK time crosses
@@ -749,7 +743,7 @@ export async function startPrimaryMarkingAction(examId: number) {
     [exam.primary_marker_id],
   );
   if (marker) {
-    const origin = await getOrigin();
+    const origin = await getRequestOrigin();
     await recordEmail(
       buildMarkerEmail({
         kind: "commence",
@@ -850,7 +844,7 @@ export async function startSecondaryMarkingAction(
       [exam.secondary_marker_id],
     );
     if (marker) {
-      const origin = await getOrigin();
+      const origin = await getRequestOrigin();
       await recordEmail(
         buildMarkerEmail({
           kind: "commence",

@@ -1,4 +1,3 @@
-import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { query, queryOne, type Exam, type Submission } from "@/lib/db";
 import { SEAT_ORDER_ASC } from "@/lib/seatSort";
@@ -8,6 +7,7 @@ import {
 } from "@/lib/examStatus";
 import { sweepDeadlineStatuses } from "@/lib/deadlines";
 import { formatDateOnly } from "@/lib/datetime";
+import { getRequestOrigin } from "@/lib/origin";
 import {
   completeFinalMarkingByTokenActionState,
   completePrimaryMarkingByTokenActionState,
@@ -20,13 +20,6 @@ import { QuickEntryForm } from "./QuickEntryForm";
 
 export const dynamic = "force-dynamic";
 
-async function getOrigin(): Promise<string> {
-  const h = await headers();
-  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000";
-  const proto = h.get("x-forwarded-proto") ?? "https";
-  return `${proto}://${host}`;
-}
-
 type MarkerRole = "primary" | "secondary";
 
 export default async function MarkerByTokenPage({
@@ -38,7 +31,7 @@ export default async function MarkerByTokenPage({
   const examId = Number(rawId);
   if (!Number.isFinite(examId)) notFound();
 
-  const origin = await getOrigin();
+  const origin = await getRequestOrigin();
   await sweepDeadlineStatuses({ origin, examId });
 
   const exam = await queryOne<Exam>("SELECT * FROM exams WHERE id = $1", [

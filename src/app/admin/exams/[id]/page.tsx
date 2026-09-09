@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { headers } from "next/headers";
 import { notFound } from "next/navigation";
+import { getRequestOrigin } from "@/lib/origin";
 import {
   EXAM_STATUS_LABEL,
   query,
@@ -48,12 +48,6 @@ import { formatDateOnly, formatDateTime, todayUkIsoDate } from "@/lib/datetime";
 
 export const dynamic = "force-dynamic";
 
-async function getOrigin(): Promise<string> {
-  const h = await headers();
-  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000";
-  const proto = h.get("x-forwarded-proto") ?? "https";
-  return `${proto}://${host}`;
-}
 
 type SeatSortKey =
   | "seat_asc"
@@ -105,7 +99,7 @@ export default async function AdminExamPage({
   if (!Number.isFinite(examId)) notFound();
   const seatSort = parseSeatSort(sp.sort);
 
-  const origin = await getOrigin();
+  const origin = await getRequestOrigin();
   await sweepDeadlineStatuses({ origin, examId });
 
   const exam = await queryOne<Exam>("SELECT * FROM exams WHERE id = $1", [

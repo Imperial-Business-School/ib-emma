@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { headers } from "next/headers";
 import {
   EXAM_STATUS_LABEL,
   query,
@@ -11,13 +10,7 @@ import { STATUS_BADGE_CLASS } from "@/lib/examStatus";
 import { sweepDeadlineStatuses } from "@/lib/deadlines";
 import { ExamFilters, type ExamType } from "../admin/ExamFilters";
 import { formatDateOnly } from "@/lib/datetime";
-
-async function getOrigin(): Promise<string> {
-  const h = await headers();
-  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000";
-  const proto = h.get("x-forwarded-proto") ?? "https";
-  return `${proto}://${host}`;
-}
+import { getRequestOrigin } from "@/lib/origin";
 
 export const dynamic = "force-dynamic";
 
@@ -85,7 +78,7 @@ export default async function ExamsListPage({
     date_to?: string;
   }>;
 }) {
-  await sweepDeadlineStatuses({ origin: await getOrigin() });
+  await sweepDeadlineStatuses({ origin: await getRequestOrigin() });
   const sp = await searchParams;
   const q = (sp.q ?? "").trim();
   const status = parseStatus(sp.status);

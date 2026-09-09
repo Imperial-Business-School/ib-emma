@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { headers } from "next/headers";
 import {
   EXAM_STATUS_LABEL,
   query,
@@ -13,15 +12,9 @@ import {
   formatDateOnly,
   formatDateTime as formatDateTimeUk,
 } from "@/lib/datetime";
+import { getRequestOrigin } from "@/lib/origin";
 
 export const dynamic = "force-dynamic";
-
-async function getOrigin(): Promise<string> {
-  const h = await headers();
-  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000";
-  const proto = h.get("x-forwarded-proto") ?? "https";
-  return `${proto}://${host}`;
-}
 
 type UpcomingRow = {
   id: number;
@@ -60,7 +53,7 @@ function todayIsoDate(): string {
 }
 
 export default async function AdminDashboard() {
-  await sweepDeadlineStatuses({ origin: await getOrigin() });
+  await sweepDeadlineStatuses({ origin: await getRequestOrigin() });
   const today = todayIsoDate();
 
   const totalRow = await queryOne<{ n: number }>(
