@@ -177,15 +177,13 @@ export default async function AdminDashboard() {
         </div>
         <div className="rounded-lg border bg-white p-4 shadow-sm">
           <h2 className="text-sm font-semibold text-slate-700">Quick links</h2>
+          <Link
+            href="/exams/create"
+            className="mt-3 inline-block rounded bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
+          >
+            + Create new exam
+          </Link>
           <ul className="mt-3 space-y-1 text-sm">
-            <li>
-              <Link
-                href="/exams/create"
-                className="text-blue-600 hover:underline"
-              >
-                + Create new exam
-              </Link>
-            </li>
             <li>
               <Link href="/exams" className="text-blue-600 hover:underline">
                 All exams
