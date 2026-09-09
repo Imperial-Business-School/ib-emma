@@ -382,9 +382,9 @@ export default async function AdminExamPage({
         <div className="border-b px-4 py-3">
           <h2 className="text-lg font-semibold">All Seats</h2>
           <p className="mt-1 text-xs text-slate-500">
-            {totalSeats} total · primary {primaryGraded}/{totalSeats}
+            {totalSeats} total · first marker: {primaryGraded}/{totalSeats}
             {sampleCount > 0 && (
-              <> · secondary {secondaryGraded}/{sampleCount}</>
+              <> · second marker: {secondaryGraded}/{sampleCount}</>
             )}
             {isFirstMarkingReview && (
               <>
@@ -395,7 +395,8 @@ export default async function AdminExamPage({
             )}
           </p>
         </div>
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto">
+        <table className="w-full min-w-max text-sm">
           <thead className="border-b bg-slate-50 text-left text-slate-600">
             <tr>
               <th className="px-4 py-2">
@@ -669,6 +670,7 @@ export default async function AdminExamPage({
             })}
           </tbody>
         </table>
+        </div>
         {exam.status === "setup" && (
           <div className="border-t p-4">
             <AddSeatForm examId={exam.id} />
