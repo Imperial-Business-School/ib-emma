@@ -347,6 +347,7 @@ export default async function MarkerByTokenPage({
         isResolving={isResolving}
         markingOpen={markingOpen}
         mcqEnabled={exam.mcq_enabled}
+        mcqWeighting={exam.mcq_weighting}
         graded={graded}
         total={total}
       />

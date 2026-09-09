@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { GRADE_REGEX_SOURCE, isValidGrade } from "@/lib/validation";
 import { formatDateTime } from "@/lib/datetime";
+import { computeWeightedGrade } from "@/lib/weighted";
 import { saveGradesByTokenAction } from "./actions";
 
 export type GradeRow = {
@@ -61,6 +62,7 @@ export function GradeTable({
   isResolving,
   markingOpen,
   mcqEnabled = false,
+  mcqWeighting = null,
   graded,
   total,
 }: {
@@ -73,6 +75,7 @@ export function GradeTable({
   graded: number;
   total: number;
   mcqEnabled?: boolean;
+  mcqWeighting?: string | null;
 }) {
   const [sort, setSort] = useState<{ key: SortKey; dir: SortDir }>({
     key: "seat",
@@ -231,6 +234,44 @@ export function GradeTable({
   // Resolving view is driven by the first marker, so their own current
   // note is Feedback too.
   const yourCommentLabel = isSecondary ? "Comments" : "Feedback";
+
+  // Running mean / std of the primary marker's saved grades. Weighted
+  // by MCQ when MCQ is enabled on the exam, so the primary sees the
+  // grade that would actually be recorded, not their raw script grade.
+  // Only shown on the first marker's normal marking view (not in the
+  // resolution phase, and never on the second marker's view).
+  const showPrimaryStats = !isSecondary && !isResolving;
+  const savedWeighted = showPrimaryStats
+    ? rows
+        .filter((r) => !r.absent && r.current_grade != null)
+        .map((r) =>
+          computeWeightedGrade(
+            r.current_grade,
+            r.mcq_score ?? null,
+            mcqWeighting,
+            mcqEnabled,
+          ),
+        )
+        .map((v) => (v == null ? NaN : Number(v)))
+        .filter((n) => Number.isFinite(n))
+    : [];
+  const statN = savedWeighted.length;
+  const statMean =
+    statN > 0
+      ? savedWeighted.reduce((a, b) => a + b, 0) / statN
+      : null;
+  const statStd =
+    statN > 1 && statMean != null
+      ? Math.sqrt(
+          savedWeighted.reduce(
+            (a, b) => a + (b - statMean) * (b - statMean),
+            0,
+          ) /
+            (statN - 1),
+        )
+      : null;
+  const fmtStat = (n: number | null) =>
+    n == null ? "—" : n.toFixed(2);
 
   return (
     <section className="rounded-lg border bg-white shadow-sm">
@@ -485,6 +526,33 @@ export function GradeTable({
                 ? `Save all (${dirtyCount} unsaved)`
                 : "Save all"}
           </button>
+        </div>
+      )}
+      {showPrimaryStats && (
+        <div className="flex flex-wrap gap-x-6 gap-y-1 border-t bg-slate-50 px-4 py-3 text-sm text-slate-700">
+          <span>
+            <span className="text-slate-500">Mean</span>
+            {mcqEnabled ? (
+              <span className="text-slate-500"> (weighted)</span>
+            ) : null}
+            :{" "}
+            <span className="font-semibold text-slate-900">
+              {fmtStat(statMean)}
+            </span>
+          </span>
+          <span>
+            <span className="text-slate-500">Std dev</span>
+            {mcqEnabled ? (
+              <span className="text-slate-500"> (weighted)</span>
+            ) : null}
+            :{" "}
+            <span className="font-semibold text-slate-900">
+              {fmtStat(statStd)}
+            </span>
+          </span>
+          <span className="text-slate-500">
+            over {statN} saved grade{statN === 1 ? "" : "s"}
+          </span>
         </div>
       )}
     </section>

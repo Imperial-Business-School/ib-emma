@@ -392,16 +392,18 @@ export default async function AdminExamPage({
                 Note: CIDs must start with a zero (i.e. 0123456, not 123456).
               </span>
             </p>
-            <div className="mt-2 flex flex-wrap items-center gap-3">
+            <div className="mt-2">
               <a
                 href={`/api/exams/${exam.id}/seats-template.xlsx`}
                 className="text-xs text-blue-600 hover:underline"
               >
                 Download blank template (Excel)
               </a>
-              <ResetSeatsForm examId={exam.id} count={totalSeats} />
             </div>
             <SeatUploadForm examId={exam.id} />
+            <div className="mt-6 flex justify-end">
+              <ResetSeatsForm examId={exam.id} count={totalSeats} />
+            </div>
           </div>
         )}
         <div className="border-b px-4 py-3">
