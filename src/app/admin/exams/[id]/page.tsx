@@ -27,6 +27,7 @@ import {
 } from "../../actions";
 import { AbsenceToggleButton } from "./AbsenceToggleButton";
 import { AddSeatForm } from "./AddSeatForm";
+import { CopyUrlButton } from "./CopyUrlButton";
 import { DeadlineForm } from "./DeadlineForm";
 import { InlineSaveForm } from "./InlineSaveForm";
 import { ResetSeatsForm } from "./ResetSeatsForm";
@@ -829,11 +830,14 @@ function MarkerCard({
       {shareUrl && (
         <div className="mt-3">
           <p className="text-xs text-slate-500">Marker URL</p>
-          <input
-            readOnly
-            value={shareUrl}
-            className="mt-1 w-full rounded border bg-slate-50 px-2 py-1 font-mono text-xs"
-          />
+          <div className="mt-1 flex items-center gap-2">
+            <input
+              readOnly
+              value={shareUrl}
+              className="min-w-0 flex-1 rounded border bg-slate-50 px-2 py-1 font-mono text-xs"
+            />
+            <CopyUrlButton url={shareUrl} />
+          </div>
           <p className="mt-1 text-xs text-slate-500">{hint}</p>
           <details className="mt-2 text-xs text-slate-600">
             <summary className="cursor-pointer hover:text-slate-900">
