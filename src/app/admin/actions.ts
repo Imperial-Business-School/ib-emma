@@ -72,6 +72,10 @@ export async function createExamAction(formData: FormData) {
       ? academicYearRaw
       : null;
   const samplingMode = parseSamplingMode(formData.get("sampling_mode"));
+  // Exam date can be past OR future (an admin might backfill an exam
+  // that has already been sat), so use the plain parser rather than
+  // the future-only one used for marking deadlines.
+  const examDate = parseDeadline(formData.get("exam_date"));
   const primaryDeadline = parseFutureDeadline(
     formData.get("primary_deadline"),
     "First marker deadline",
@@ -106,6 +110,7 @@ export async function createExamAction(formData: FormData) {
   if (!name) throw new Error("Exam name is required");
   if (!moduleName) throw new Error("Module name is required");
   if (!code) throw new Error("Module code is required");
+  if (!examDate) throw new Error("Exam date is required");
   if (!primaryDeadline) {
     throw new Error("First marker deadline is required");
   }
@@ -135,8 +140,8 @@ export async function createExamAction(formData: FormData) {
         secondary_marker_id, status, sampling_mode,
         primary_access_token, secondary_access_token,
         primary_deadline_date, secondary_deadline_date, programme_id,
-        mcq_enabled, mcq_weighting, is_resit)
-     VALUES ($1, $2, $3, $4, $5, $6, 'setup', $7, $8, $9, $10, $11, $12, $13, $14, $15)
+        mcq_enabled, mcq_weighting, is_resit, exam_date)
+     VALUES ($1, $2, $3, $4, $5, $6, 'setup', $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
      RETURNING id`,
     [
       name,
@@ -154,6 +159,7 @@ export async function createExamAction(formData: FormData) {
       mcqEnabled,
       mcqWeighting,
       isResit,
+      examDate,
     ],
   );
   if (!row) throw new Error("Failed to create exam");

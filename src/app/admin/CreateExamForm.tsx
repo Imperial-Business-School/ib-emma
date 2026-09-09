@@ -128,6 +128,20 @@ export function CreateExamForm({
           ))}
         </select>
       </label>
+      <label className="text-sm md:col-span-2">
+        <span className="block text-xs font-medium text-slate-600">
+          Exam date
+        </span>
+        <input
+          type="date"
+          name="exam_date"
+          required
+          className="mt-1 w-full rounded border px-3 py-2 text-sm"
+        />
+        <span className="mt-1 block text-xs text-slate-500">
+          The date the exam is (or was) sat.
+        </span>
+      </label>
       <fieldset className="rounded border bg-slate-50 p-3 md:col-span-2">
         <legend className="px-1 text-xs font-semibold uppercase text-slate-500">
           Exam type

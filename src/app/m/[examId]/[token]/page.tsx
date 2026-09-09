@@ -211,6 +211,11 @@ export default async function MarkerByTokenPage({
             {isSecondary ? "sampled seats" : "seats"} graded.
           </p>
         )}
+        {exam.exam_date && (
+          <p className="mt-2 text-sm text-slate-600">
+            <strong>Exam date:</strong> {formatDateOnly(exam.exam_date)}
+          </p>
+        )}
         {myDeadline && !isResolving && !marksSubmitted && (
           <div
             className={`mt-4 rounded-lg border px-4 py-3 text-sm ${

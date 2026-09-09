@@ -282,6 +282,15 @@ export default async function AdminExamPage({
         />
       </section>
 
+      <section className="rounded-lg border bg-white p-4 shadow-sm">
+        <p className="text-xs font-semibold uppercase text-slate-500">
+          Exam date
+        </p>
+        <p className="mt-1 font-medium">
+          {exam.exam_date ? formatDateOnly(exam.exam_date) : "Not set"}
+        </p>
+      </section>
+
       <section className="grid gap-4 md:grid-cols-2">
         <div className="rounded-lg border bg-white p-4 shadow-sm">
           <p className="text-xs font-semibold uppercase text-slate-500">
