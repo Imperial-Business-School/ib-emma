@@ -1,10 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useActionState, useState } from "react";
 import type { ProgrammeLevel } from "@/lib/examStatus";
 import { todayUkIsoDate } from "@/lib/datetime";
 import { SubmitButton } from "@/components/SubmitButton";
-import { createExamAction } from "./actions";
+import {
+  SAVE_STATE_INITIAL,
+  type SaveState,
+} from "@/lib/actionState";
+import { createExamActionState } from "./actions";
 
 type Prog = {
   id: number;
@@ -27,24 +31,31 @@ export function CreateExamForm({
   const [mcqEnabled, setMcqEnabled] = useState(false);
   const [mcqWeighting, setMcqWeighting] = useState("");
   const today = todayUkIsoDate();
-  const [error, setError] = useState<string | null>(null);
+  const [clientError, setClientError] = useState<string | null>(null);
+  const [state, formAction] = useActionState<SaveState, FormData>(
+    createExamActionState,
+    SAVE_STATE_INITIAL,
+  );
+  // Client-side pre-flight errors take precedence over the last
+  // server response so the marker sees the most recent feedback.
+  const displayError = clientError ?? state.error;
 
   const emailsMatch =
     primaryEmail.trim() !== "" &&
     primaryEmail.trim().toLowerCase() === secondaryEmail.trim().toLowerCase();
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
-    setError(null);
+    setClientError(null);
     if (emailsMatch) {
       e.preventDefault();
-      setError("First and second markers must be different people.");
+      setClientError("First and second markers must be different people.");
       return;
     }
     if (mcqEnabled) {
       const w = mcqWeighting.trim();
       if (!/^\d+(\.\d{1,2})?$/.test(w)) {
         e.preventDefault();
-        setError(
+        setClientError(
           "MCQ weighting must be a number between 0 and 100 with up to 2 decimal places.",
         );
         return;
@@ -52,7 +63,7 @@ export function CreateExamForm({
       const n = Number(w);
       if (!Number.isFinite(n) || n < 0 || n > 100) {
         e.preventDefault();
-        setError("MCQ weighting must be between 0 and 100.");
+        setClientError("MCQ weighting must be between 0 and 100.");
         return;
       }
     }
@@ -61,13 +72,13 @@ export function CreateExamForm({
 
   return (
     <form
-      action={createExamAction}
+      action={formAction}
       onSubmit={onSubmit}
       className="mt-4 grid gap-3 md:grid-cols-2"
     >
-      {error && (
+      {displayError && (
         <div className="rounded border border-red-300 bg-red-50 p-2 text-sm text-red-800 md:col-span-2">
-          {error}
+          {displayError}
         </div>
       )}
       <input

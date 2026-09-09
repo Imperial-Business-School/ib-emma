@@ -974,3 +974,30 @@ export async function updateExamDateActionState(
     return toErrorState(e);
   }
 }
+
+// createExamAction ends in a redirect() to the new exam page, which
+// throws a NEXT_REDIRECT sentinel Next.js catches. We must let that
+// propagate through the state wrapper — any OTHER throw is a real
+// validation failure and turns into an inline SaveState.error.
+function isNextControlFlow(e: unknown): boolean {
+  if (!e || typeof e !== "object" || !("digest" in e)) return false;
+  const digest = (e as { digest: unknown }).digest;
+  return (
+    typeof digest === "string" &&
+    (digest.startsWith("NEXT_REDIRECT") || digest === "NEXT_NOT_FOUND")
+  );
+}
+
+export async function createExamActionState(
+  _prev: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
+  try {
+    await createExamAction(formData);
+    // Unreachable — createExamAction always redirects on success.
+    return { ok: true, error: null };
+  } catch (e) {
+    if (isNextControlFlow(e)) throw e;
+    return toErrorState(e);
+  }
+}
