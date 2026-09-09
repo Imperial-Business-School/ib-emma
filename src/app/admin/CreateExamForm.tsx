@@ -1,13 +1,9 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useState, useTransition } from "react";
 import type { ProgrammeLevel } from "@/lib/examStatus";
 import { todayUkIsoDate } from "@/lib/datetime";
-import { SubmitButton } from "@/components/SubmitButton";
-import {
-  SAVE_STATE_INITIAL,
-  type SaveState,
-} from "@/lib/actionState";
+import { SAVE_STATE_INITIAL } from "@/lib/actionState";
 import { createExamActionState } from "./actions";
 
 type Prog = {
@@ -31,30 +27,31 @@ export function CreateExamForm({
   const [mcqEnabled, setMcqEnabled] = useState(false);
   const [mcqWeighting, setMcqWeighting] = useState("");
   const today = todayUkIsoDate();
+  // Client- and server-side errors are tracked separately but rendered
+  // in the same banner near the deadline fields. The form is submitted
+  // manually via startTransition (not via the native form action) so
+  // React 19 doesn't reset the uncontrolled inputs after a server-side
+  // validation failure — everything the admin typed stays put.
   const [clientError, setClientError] = useState<string | null>(null);
-  const [state, formAction] = useActionState<SaveState, FormData>(
-    createExamActionState,
-    SAVE_STATE_INITIAL,
-  );
-  // Client-side pre-flight errors take precedence over the last
-  // server response so the marker sees the most recent feedback.
-  const displayError = clientError ?? state.error;
+  const [serverError, setServerError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+  const displayError = clientError ?? serverError;
 
   const emailsMatch =
     primaryEmail.trim() !== "" &&
     primaryEmail.trim().toLowerCase() === secondaryEmail.trim().toLowerCase();
 
-  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+  function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
     setClientError(null);
+    setServerError(null);
     if (emailsMatch) {
-      e.preventDefault();
       setClientError("First and second markers must be different people.");
       return;
     }
     if (mcqEnabled) {
       const w = mcqWeighting.trim();
       if (!/^\d+(\.\d{1,2})?$/.test(w)) {
-        e.preventDefault();
         setClientError(
           "MCQ weighting must be a number between 0 and 100 with up to 2 decimal places.",
         );
@@ -62,25 +59,24 @@ export function CreateExamForm({
       }
       const n = Number(w);
       if (!Number.isFinite(n) || n < 0 || n > 100) {
-        e.preventDefault();
         setClientError("MCQ weighting must be between 0 and 100.");
         return;
       }
     }
-    // otherwise let the server action run
+    const fd = new FormData(e.currentTarget);
+    startTransition(async () => {
+      const result = await createExamActionState(SAVE_STATE_INITIAL, fd);
+      // Success redirects via Next.js server-action machinery, so we
+      // only reach here on a validation failure.
+      if (!result.ok && result.error) setServerError(result.error);
+    });
   }
 
   return (
     <form
-      action={formAction}
       onSubmit={onSubmit}
       className="mt-4 grid gap-3 md:grid-cols-2"
     >
-      {displayError && (
-        <div className="rounded border border-red-300 bg-red-50 p-2 text-sm text-red-800 md:col-span-2">
-          {displayError}
-        </div>
-      )}
       <input
         name="name"
         required
@@ -273,6 +269,14 @@ export function CreateExamForm({
           </p>
         )}
       </div>
+      {displayError && (
+        <div
+          role="alert"
+          className="rounded border border-red-300 bg-red-50 p-2 text-sm text-red-800 md:col-span-2"
+        >
+          {displayError}
+        </div>
+      )}
       <label className="text-sm md:col-span-2">
         <span className="block text-xs font-medium text-slate-600">
           First marker deadline
@@ -285,7 +289,8 @@ export function CreateExamForm({
           className="mt-1 w-full rounded border px-3 py-2 text-sm"
         />
         <span className="mt-1 block text-xs text-slate-500">
-          Set to 10:00 UK time on this date.
+          Set to 10:00 UK time on this date. Must be on or after the exam
+          date.
         </span>
       </label>
       <label className="text-sm md:col-span-2">
@@ -299,12 +304,17 @@ export function CreateExamForm({
           required
           className="mt-1 w-full rounded border px-3 py-2 text-sm"
         />
+        <span className="mt-1 block text-xs text-slate-500">
+          Must be on or after the first marker deadline.
+        </span>
       </label>
-      <SubmitButton
-        label="Create exam"
-        disabled={emailsMatch}
+      <button
+        type="submit"
+        disabled={emailsMatch || pending}
         className="rounded bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50 md:col-span-2"
-      />
+      >
+        {pending ? "Submitting…" : "Create exam"}
+      </button>
     </form>
   );
 }
