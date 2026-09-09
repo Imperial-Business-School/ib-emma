@@ -10,7 +10,7 @@ import {
 import { STATUS_BADGE_CLASS } from "@/lib/examStatus";
 import { sweepDeadlineStatuses } from "@/lib/deadlines";
 import { ExamFilters, type ExamType } from "../admin/ExamFilters";
-import { formatDate } from "@/lib/datetime";
+import { formatDateOnly } from "@/lib/datetime";
 
 async function getOrigin(): Promise<string> {
   const h = await headers();
@@ -26,23 +26,23 @@ type ExamRow = Exam & { total: number; graded: number };
 const PAGE_SIZE_DEFAULT = 25;
 
 type SortKey =
-  | "created_desc"
-  | "created_asc"
+  | "exam_date_desc"
+  | "exam_date_asc"
   | "name_asc"
   | "name_desc"
   | "status_asc";
 
 const SORT_SQL: Record<SortKey, string> = {
-  created_desc: "e.created_at DESC",
-  created_asc: "e.created_at ASC",
+  exam_date_desc: "e.exam_date DESC NULLS LAST, e.created_at DESC",
+  exam_date_asc: "e.exam_date ASC NULLS LAST, e.created_at DESC",
   name_asc: "lower(e.name) ASC",
   name_desc: "lower(e.name) DESC",
-  status_asc: "e.status ASC, e.created_at DESC",
+  status_asc: "e.status ASC, e.exam_date DESC NULLS LAST",
 };
 
 function parseSort(v: string | undefined): SortKey {
   if (v && v in SORT_SQL) return v as SortKey;
-  return "created_desc";
+  return "exam_date_desc";
 }
 
 function parseStatus(v: string | undefined): ExamStatus | null {
@@ -156,7 +156,7 @@ export default async function ExamsListPage({
     const params = new URLSearchParams();
     if (q) params.set("q", q);
     if (status) params.set("status", status);
-    if (sort !== "created_desc") params.set("sort", sort);
+    if (sort !== "exam_date_desc") params.set("sort", sort);
     if (pageSize !== PAGE_SIZE_DEFAULT) params.set("pageSize", String(pageSize));
     if (safePage !== 1) params.set("page", String(safePage));
     if (programmeId != null) params.set("programme", String(programmeId));
@@ -238,9 +238,9 @@ export default async function ExamsListPage({
               <th className="px-4 py-2">
                 <SortLink
                   current={sort}
-                  asc="created_asc"
-                  desc="created_desc"
-                  label="Created"
+                  asc="exam_date_asc"
+                  desc="exam_date_desc"
+                  label="Exam date"
                   href={(s) => buildHref({ sort: s, page: 1 })}
                 />
               </th>
@@ -275,7 +275,7 @@ export default async function ExamsListPage({
                   {e.graded} / {e.total} primary
                 </td>
                 <td className="px-4 py-3 text-slate-600">
-                  {formatDate(e.created_at)}
+                  {e.exam_date ? formatDateOnly(e.exam_date) : "—"}
                 </td>
                 <td className="px-4 py-3 text-right">
                   <Link

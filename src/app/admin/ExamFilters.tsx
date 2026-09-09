@@ -5,15 +5,15 @@ import { useEffect, useState, useTransition } from "react";
 import { EXAM_STATUS_LABEL, type ExamStatus } from "@/lib/examStatus";
 
 type Sort =
-  | "created_desc"
-  | "created_asc"
+  | "exam_date_desc"
+  | "exam_date_asc"
   | "name_asc"
   | "name_desc"
   | "status_asc";
 
 const SORT_LABELS: Record<Sort, string> = {
-  created_desc: "Newest first",
-  created_asc: "Oldest first",
+  exam_date_desc: "Exam date (newest first)",
+  exam_date_asc: "Exam date (oldest first)",
   name_asc: "Name (A → Z)",
   name_desc: "Name (Z → A)",
   status_asc: "Status",
@@ -68,7 +68,7 @@ export function ExamFilters({
     const params = new URLSearchParams();
     if (debouncedQ.trim()) params.set("q", debouncedQ.trim());
     if (status !== "all") params.set("status", status);
-    if (sort !== "created_desc") params.set("sort", sort);
+    if (sort !== "exam_date_desc") params.set("sort", sort);
     if (pageSize !== 25) params.set("pageSize", String(pageSize));
     if (programmeId !== "all") params.set("programme", String(programmeId));
     if (academicYear !== "all") params.set("year", academicYear);
