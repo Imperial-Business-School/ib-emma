@@ -37,6 +37,15 @@ export function CreateExamForm({
   const [pending, startTransition] = useTransition();
   const displayError = clientError ?? serverError;
 
+  // Matches the same shape the server enforces via parseEmail: at
+  // least one non-whitespace char before @, at least one between @
+  // and ., at least one after the . (so "bob@bob" is rejected but
+  // "bob@bob.co" is fine).
+  const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const EMAIL_PATTERN = "[^\\s@]+@[^\\s@]+\\.[^\\s@]+";
+  const EMAIL_TITLE =
+    "Enter a valid email address, e.g. name@example.com";
+
   const emailsMatch =
     primaryEmail.trim() !== "" &&
     primaryEmail.trim().toLowerCase() === secondaryEmail.trim().toLowerCase();
@@ -45,6 +54,18 @@ export function CreateExamForm({
     e.preventDefault();
     setClientError(null);
     setServerError(null);
+    if (!EMAIL_REGEX.test(primaryEmail.trim())) {
+      setClientError(
+        "First marker email is not a valid address (e.g. name@example.com).",
+      );
+      return;
+    }
+    if (!EMAIL_REGEX.test(secondaryEmail.trim())) {
+      setClientError(
+        "Second marker email is not a valid address (e.g. name@example.com).",
+      );
+      return;
+    }
     if (emailsMatch) {
       setClientError("First and second markers must be different people.");
       return;
@@ -235,6 +256,8 @@ export function CreateExamForm({
           value={primaryEmail}
           onChange={(e) => setPrimaryEmail(e.target.value)}
           placeholder="first@imperial.ac.uk"
+          pattern={EMAIL_PATTERN}
+          title={EMAIL_TITLE}
           className="mt-2 w-full rounded border px-3 py-2 text-sm"
         />
         <input
@@ -255,6 +278,8 @@ export function CreateExamForm({
           value={secondaryEmail}
           onChange={(e) => setSecondaryEmail(e.target.value)}
           placeholder="second@imperial.ac.uk"
+          pattern={EMAIL_PATTERN}
+          title={EMAIL_TITLE}
           className={`mt-2 w-full rounded border px-3 py-2 text-sm ${emailsMatch ? "border-red-400" : ""}`}
         />
         <input
