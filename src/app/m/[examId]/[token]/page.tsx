@@ -229,8 +229,8 @@ export default async function MarkerByTokenPage({
                   : "Deadline"}
             </span>{" "}
             <span>
-              Your grades must be submitted by the end of{" "}
-              <strong>{formatDateOnly(myDeadline)}</strong> (UK time).
+              Your grades must be submitted by 10:00 UK time on{" "}
+              <strong>{formatDateOnly(myDeadline)}</strong>.
             </span>
           </div>
         )}

@@ -163,7 +163,7 @@ export function buildMarkerEmail(opts: {
     : opts.examName;
   const greeting = opts.markerName ? `Hi ${opts.markerName},` : "Hi,";
   const deadlineLine = opts.deadline
-    ? `Deadline: end of ${formatDateOnly(opts.deadline)} (UK time)`
+    ? `Deadline: 10:00 on ${formatDateOnly(opts.deadline)} (UK time)`
     : "Deadline: not set";
   const roleLabel = opts.role === "primary" ? "first" : "second";
 

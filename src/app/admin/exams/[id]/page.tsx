@@ -289,14 +289,14 @@ export default async function AdminExamPage({
           </p>
           {exam.primary_deadline_date && (
             <p className="mt-1 font-medium">
-              End of {formatDateOnly(exam.primary_deadline_date)} (UK time)
+              10:00 on {formatDateOnly(exam.primary_deadline_date)} (UK time)
             </p>
           )}
           <DeadlineForm
             action={updatePrimaryDeadlineActionState.bind(null, exam.id)}
             name="primary_deadline"
             defaultValue={exam.primary_deadline_date ?? ""}
-            helper="Deadline is end of that day, UK time."
+            helper="Deadline is 10:00 UK time on this date."
           />
         </div>
         <div className="rounded-lg border bg-white p-4 shadow-sm">
@@ -305,14 +305,14 @@ export default async function AdminExamPage({
           </p>
           {exam.secondary_deadline_date && (
             <p className="mt-1 font-medium">
-              End of {formatDateOnly(exam.secondary_deadline_date)} (UK time)
+              10:00 on {formatDateOnly(exam.secondary_deadline_date)} (UK time)
             </p>
           )}
           <DeadlineForm
             action={updateSecondaryDeadlineActionState.bind(null, exam.id)}
             name="secondary_deadline"
             defaultValue={exam.secondary_deadline_date ?? ""}
-            helper="Deadline is end of that day, UK time."
+            helper="Deadline is 10:00 UK time on this date."
           />
         </div>
       </section>
