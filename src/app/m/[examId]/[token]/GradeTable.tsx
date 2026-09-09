@@ -61,6 +61,8 @@ export function GradeTable({
   isResolving,
   markingOpen,
   mcqEnabled = false,
+  graded,
+  total,
 }: {
   examId: number;
   token: string;
@@ -68,6 +70,8 @@ export function GradeTable({
   isSecondary: boolean;
   isResolving: boolean;
   markingOpen: boolean;
+  graded: number;
+  total: number;
   mcqEnabled?: boolean;
 }) {
   const [sort, setSort] = useState<{ key: SortKey; dir: SortDir }>({
@@ -235,7 +239,22 @@ export function GradeTable({
                 ? "Sampled seats"
                 : "All seats"}
           </h2>
-          <p className="text-xs text-slate-500">
+          <p
+            className={`mt-1 text-xl font-semibold ${
+              total > 0 && graded === total
+                ? "text-green-700"
+                : "text-slate-800"
+            }`}
+          >
+            {graded} of {total}{" "}
+            {isResolving
+              ? "resolved"
+              : isSecondary
+                ? "sampled seats graded"
+                : "seats graded"}
+            {total > 0 && graded === total ? " ✓" : ""}
+          </p>
+          <p className="mt-1 text-xs text-slate-500">
             CIDs are hidden from markers. Comments are optional.
           </p>
         </div>

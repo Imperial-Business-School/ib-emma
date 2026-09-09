@@ -242,7 +242,7 @@ export default async function MarkerByTokenPage({
           <p className="mt-2 text-sm text-slate-600">
             <strong>Final marking.</strong> Review each discrepancy below
             between your grade and the second marker&apos;s, and submit a
-            final grade. {graded} of {total} resolved.
+            final grade.
           </p>
         ) : (
           <p className="mt-2 text-sm text-slate-600">
@@ -254,9 +254,7 @@ export default async function MarkerByTokenPage({
                 If you are not {markerDisplayName}, please close this window
                 and contact the Exams team.
               </>
-            )}{" "}
-            {graded} of {total}{" "}
-            {isSecondary ? "sampled seats" : "seats"} graded.
+            )}
           </p>
         )}
         {myDeadline && !isResolving && !marksSubmitted && (
@@ -348,6 +346,8 @@ export default async function MarkerByTokenPage({
         isResolving={isResolving}
         markingOpen={markingOpen}
         mcqEnabled={exam.mcq_enabled}
+        graded={graded}
+        total={total}
       />
 
       {markingOpen && (
