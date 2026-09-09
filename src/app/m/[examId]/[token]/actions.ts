@@ -68,7 +68,7 @@ export async function saveGradesByTokenAction(
   for (const u of updates) {
     if (!isValidGrade(u.grade.trim())) {
       throw new Error(
-        `Grade "${u.grade}" must be a number between 0 and 100 with at most one decimal place`,
+        `Grade "${u.grade}" must be a number between 0 and 100 with up to two decimal places`,
       );
     }
   }
@@ -230,7 +230,7 @@ export async function setGradeBySeatByTokenAction(
   if (!seat) return;
   if (!isValidGrade(grade)) {
     throw new Error(
-      "Grade must be a number between 0 and 100 with at most one decimal place",
+      "Grade must be a number between 0 and 100 with up to two decimal places",
     );
   }
 
@@ -386,7 +386,7 @@ export async function uploadGradesCsvByTokenAction(
     }
     if (hasGrade && !isValidGrade(gradeCell)) {
       skipped.push(
-        `Seat ${seat}: grade "${gradeCell}" must be a number between 0 and 100 with at most one decimal place`,
+        `Seat ${seat}: grade "${gradeCell}" must be a number between 0 and 100 with up to two decimal places`,
       );
       continue;
     }

@@ -49,9 +49,9 @@ export function QuickEntryForm({
           name="grade"
           placeholder="Grade"
           required
-          pattern="^\d+(\.\d)?$"
+          pattern="^\d+(\.\d{1,2})?$"
           inputMode="decimal"
-          title="A number between 0 and 100 with at most one decimal place, e.g. 70 or 70.5"
+          title="A number between 0 and 100 with up to two decimal places, e.g. 70, 70.5, or 70.55"
           className="w-32 rounded border px-3 py-2 text-sm"
         />
         <input

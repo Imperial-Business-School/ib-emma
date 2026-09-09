@@ -202,10 +202,16 @@ export async function setMcqScoreAction(
 ) {
   await requireAdmin();
   const raw = String(formData.get("mcq_score") ?? "").trim();
-  if (raw !== "" && !/^\d+(\.\d{1,2})?$/.test(raw)) {
-    throw new Error(
-      "MCQ score must be a number with up to 2 decimal places",
-    );
+  if (raw !== "") {
+    if (!/^\d+(\.\d{1,2})?$/.test(raw)) {
+      throw new Error(
+        "MCQ score must be a number between 0 and 100 with up to 2 decimal places",
+      );
+    }
+    const n = Number(raw);
+    if (!Number.isFinite(n) || n < 0 || n > 100) {
+      throw new Error("MCQ score must be between 0 and 100");
+    }
   }
   await query(
     "UPDATE submissions SET mcq_score = $1 WHERE id = $2 AND exam_id = $3",
@@ -264,11 +270,20 @@ export async function uploadMcqCsvAction(
       skipped.push(`Row for ${cid || seat}: not in exam`);
       continue;
     }
-    if (score !== "" && !/^\d+(\.\d{1,2})?$/.test(score)) {
-      skipped.push(
-        `Seat ${target.seat_number}: MCQ score "${score}" is not a valid number`,
-      );
-      continue;
+    if (score !== "") {
+      if (!/^\d+(\.\d{1,2})?$/.test(score)) {
+        skipped.push(
+          `Seat ${target.seat_number}: MCQ score "${score}" must be a number between 0 and 100 with up to 2 decimal places`,
+        );
+        continue;
+      }
+      const n = Number(score);
+      if (!Number.isFinite(n) || n < 0 || n > 100) {
+        skipped.push(
+          `Seat ${target.seat_number}: MCQ score "${score}" must be between 0 and 100`,
+        );
+        continue;
+      }
     }
     await query(
       "UPDATE submissions SET mcq_score = $1 WHERE id = $2",
@@ -321,16 +336,15 @@ export async function adminOverrideGradeAction(
   const { getActingAdmin } = await import("@/lib/actor");
   const acting = await getActingAdmin();
   const raw = String(formData.get("value") ?? "").trim();
-  if (raw !== "" && !/^\d+(\.\d{1,2})?$/.test(raw)) {
-    throw new Error(
-      "Grade must be a number with up to 2 decimal places",
-    );
-  }
-  // Grade fields (not MCQ) are constrained to the 0-100 range.
-  if (raw !== "" && field !== "mcq_score") {
+  if (raw !== "") {
+    if (!/^\d+(\.\d{1,2})?$/.test(raw)) {
+      throw new Error(
+        "Value must be a number between 0 and 100 with up to 2 decimal places",
+      );
+    }
     const n = Number(raw);
     if (!Number.isFinite(n) || n < 0 || n > 100) {
-      throw new Error("Grade must be between 0 and 100");
+      throw new Error("Value must be between 0 and 100");
     }
   }
   const value = raw === "" ? null : raw;

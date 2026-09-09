@@ -279,8 +279,8 @@ export default async function MarkerByTokenPage({
           <h2 className="text-lg font-semibold">Quick entry</h2>
           <p className="mt-1 text-sm text-slate-600">
             Type a seat number and grade, then press Enter. Grades must be a
-            number between 0 and 100 with at most one decimal place (e.g. 70
-            or 70.5).
+            number between 0 and 100 with up to two decimal places (e.g. 70,
+            70.5, or 70.55).
           </p>
           <QuickEntryForm examId={examId} token={token} />
         </section>
