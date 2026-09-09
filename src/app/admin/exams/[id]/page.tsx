@@ -28,6 +28,7 @@ import {
 import { AbsenceToggleButton } from "./AbsenceToggleButton";
 import { AddSeatForm } from "./AddSeatForm";
 import { CopyUrlButton } from "./CopyUrlButton";
+import { ScrollToTopOnMount } from "./ScrollToTopOnMount";
 import { DeadlineForm } from "./DeadlineForm";
 import { InlineSaveForm } from "./InlineSaveForm";
 import { ResetSeatsForm } from "./ResetSeatsForm";
@@ -157,11 +158,14 @@ export default async function AdminExamPage({
   return (
     <div className="space-y-8">
       {justStarted && (
-        <div className="rounded-lg border border-green-300 bg-green-50 p-5 text-center shadow-sm">
-          <p className="text-lg font-semibold text-green-800">
-            Exam setup complete. First marking in progress.
-          </p>
-        </div>
+        <>
+          <ScrollToTopOnMount />
+          <div className="rounded-lg border border-green-300 bg-green-50 p-5 text-center shadow-sm">
+            <p className="text-lg font-semibold text-green-800">
+              Exam setup complete. First marking in progress.
+            </p>
+          </div>
+        </>
       )}
       <div className="flex items-start justify-between">
         <div>
