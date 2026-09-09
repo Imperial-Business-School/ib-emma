@@ -302,6 +302,9 @@ export default async function MarkerByTokenPage({
                     ? "Thanks. The first marker is reviewing any discrepancies between your grades and theirs."
                     : "Thanks. This exam is now complete."}
               </p>
+              <p className="mt-2 text-sm font-medium text-green-900">
+                You can now close this tab.
+              </p>
             </div>
           </div>
         </div>
