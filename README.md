@@ -49,6 +49,25 @@ URL widely.
 The only required env var is `POSTGRES_URL` (auto-set when you add a
 Postgres integration during the deploy wizard).
 
+### `PUBLIC_APP_ORIGIN` (production)
+
+Marker URLs baked into notification emails default to whatever
+hostname served the request that triggered the email. On Vercel that
+resolves to a `*.vercel.app` alias, which is not what we want reaching
+markers.
+
+Set `PUBLIC_APP_ORIGIN` on the **Production** environment only to pin
+every outbound link to the canonical domain:
+
+```
+PUBLIC_APP_ORIGIN=https://ib-marking.imperial.ac.uk
+```
+
+Leave Preview and Development unchecked so those keep using their own
+hostnames. Redeploy Production after saving so the new value is picked
+up. Preview links and local dev continue to resolve to the request
+host automatically.
+
 ## Running locally
 
 ```
