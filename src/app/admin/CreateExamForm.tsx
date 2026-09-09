@@ -88,14 +88,17 @@ export function CreateExamForm({
       />
       <label className="text-sm md:col-span-2">
         <span className="block text-xs font-medium text-slate-600">
-          Programme (optional)
+          Programme
         </span>
         <select
           name="programme_id"
           defaultValue=""
+          required
           className="mt-1 w-full rounded border bg-white px-3 py-2 text-sm"
         >
-          <option value="">— No programme —</option>
+          <option value="" disabled>
+            — Select a programme —
+          </option>
           {programmes.map((p) => (
             <option key={p.id} value={p.id}>
               {p.name} ({p.programme_id}, {p.level})

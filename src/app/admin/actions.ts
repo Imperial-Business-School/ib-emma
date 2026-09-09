@@ -98,8 +98,8 @@ export async function createExamAction(formData: FormData) {
       throw new Error("MCQ weighting must be between 0 and 100");
     }
   }
-  if (programmeIdRaw && !Number.isFinite(programmeId)) {
-    throw new Error("Programme selection is invalid");
+  if (!programmeIdRaw || !Number.isFinite(programmeId)) {
+    throw new Error("Programme is required");
   }
   if (!name) throw new Error("Exam name is required");
   if (!primaryDeadline) {
