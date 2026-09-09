@@ -258,20 +258,6 @@ export function GradeTable({
             CIDs are hidden from markers. Comments are optional.
           </p>
         </div>
-        {markingOpen && (
-          <button
-            type="button"
-            onClick={saveAll}
-            disabled={pendingIds.size > 0}
-            className="rounded bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-400"
-          >
-            {pendingIds.size > 0
-              ? "Submitting…"
-              : dirtyCount > 0
-                ? `Save all (${dirtyCount} unsaved)`
-                : "Save all"}
-          </button>
-        )}
       </div>
       {error && (
         <div className="border-b border-red-200 bg-red-50 px-4 py-2 text-sm text-red-800">
@@ -477,6 +463,22 @@ export function GradeTable({
           })}
         </tbody>
       </table>
+      {markingOpen && (
+        <div className="flex justify-end border-t px-4 py-3">
+          <button
+            type="button"
+            onClick={saveAll}
+            disabled={pendingIds.size > 0}
+            className="rounded bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-400"
+          >
+            {pendingIds.size > 0
+              ? "Submitting…"
+              : dirtyCount > 0
+                ? `Save all (${dirtyCount} unsaved)`
+                : "Save all"}
+          </button>
+        </div>
+      )}
     </section>
   );
 }
