@@ -32,7 +32,7 @@ export async function GET(
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet("Seats");
   sheet.columns = [
-    { header: "Seat number", key: "seat", width: 15 },
+    { header: "Seat number", key: "seat", width: 15, style: { numFmt: "@" } },
     { header: "CID", key: "cid", width: 15, style: { numFmt: "@" } },
   ];
   // Style the header row for visibility.

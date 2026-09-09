@@ -33,15 +33,15 @@ export function McqUploadPanel({ examId }: { examId: number }) {
   return (
     <div>
       <p className="text-sm text-slate-600">
-        Upload MCQ scores as CSV with headers <code>CID</code>,{" "}
-        <code>Seat</code>, <code>MCQ score</code>.
+        Upload MCQ scores with columns <code>Seat number</code>,{" "}
+        <code>CID</code>, <code>MCQ score</code>.
       </p>
       <p className="mt-2">
         <a
-          href={`/api/exams/${examId}/mcq-template.csv`}
+          href={`/api/exams/${examId}/mcq-template.xlsx`}
           className="text-xs text-blue-600 hover:underline"
         >
-          Download blank template CSV
+          Download blank template (Excel)
         </a>
       </p>
       <form
@@ -52,7 +52,7 @@ export function McqUploadPanel({ examId }: { examId: number }) {
           ref={fileRef}
           type="file"
           name="file"
-          accept=".csv,text/csv"
+          accept=".csv,text/csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
           required
           className="text-sm"
         />

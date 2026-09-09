@@ -229,9 +229,8 @@ export async function uploadMcqCsvAction(
   if (!(file instanceof File) || file.size === 0) {
     throw new Error("No file uploaded");
   }
-  const text = await file.text();
-  const rows = parseCsv(text);
-  if (rows.length === 0) throw new Error("CSV is empty");
+  const rows = await parseTabularFile(file);
+  if (rows.length === 0) throw new Error("File is empty");
 
   const first = rows[0].map((s) => s.trim().toLowerCase());
   const hasHeader = first.some((c) => /cid|seat|mcq|score/i.test(c));
@@ -569,7 +568,7 @@ export async function reassignMarkerAction(
 // tabular string[][]. XLSX is detected by extension/MIME so admins
 // can upload either the .xlsx template we hand them or a CSV they
 // saved out from Excel.
-async function parseSeatsFile(file: File): Promise<string[][]> {
+async function parseTabularFile(file: File): Promise<string[][]> {
   const name = file.name.toLowerCase();
   const looksLikeXlsx =
     name.endsWith(".xlsx") ||
@@ -607,7 +606,7 @@ export async function uploadSeatsAction(examId: number, formData: FormData) {
   if (!(file instanceof File) || file.size === 0) {
     throw new Error("No file uploaded");
   }
-  const rows = await parseSeatsFile(file);
+  const rows = await parseTabularFile(file);
   if (rows.length === 0) throw new Error("File is empty");
 
   // Header detection: look for known column names and remember their
