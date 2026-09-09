@@ -8,7 +8,7 @@ import {
 } from "@/lib/examStatus";
 import { computeFinalGrade } from "@/lib/finalGrade";
 import { computeSampleIdsForMode } from "@/lib/sampling";
-import { parseCsv as parseCsvText } from "@/lib/csv";
+import { parseTabularFile } from "@/lib/tabular";
 import { type SaveState, toErrorState } from "@/lib/actionState";
 
 type MarkerRole = "primary" | "secondary";
@@ -296,9 +296,8 @@ export async function uploadGradesCsvByTokenAction(
   if (!(file instanceof File) || file.size === 0) {
     throw new Error("No file uploaded");
   }
-  const text = await file.text();
-  const rows = parseCsvText(text);
-  if (rows.length === 0) throw new Error("CSV is empty");
+  const rows = await parseTabularFile(file);
+  if (rows.length === 0) throw new Error("File is empty");
 
   const first = rows[0].map((s) => s.trim().toLowerCase());
   const hasHeader = first.some((c) => /seat|grade|comment|mark/i.test(c));

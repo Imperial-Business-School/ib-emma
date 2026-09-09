@@ -71,16 +71,16 @@ export function MarkerUploadPanel({
     <section className="rounded-lg border bg-white p-6 shadow-sm">
       <h2 className="text-lg font-semibold">Bulk actions</h2>
       <p className="mt-1 text-sm text-slate-600">
-        Upload a CSV with columns <code>Seat number</code>,{" "}
+        Upload grades with columns <code>Seat number</code>,{" "}
         <code>Grade</code>, <code>Comments</code>. Rows for students marked
         absent by the admin are ignored; the rest are saved.
       </p>
       <div className="mt-3 flex flex-wrap items-center gap-3">
         <a
-          href={`/api/m/${examId}/${token}/grades-template.csv`}
+          href={`/api/m/${examId}/${token}/grades-template.xlsx`}
           className="text-xs text-blue-600 hover:underline"
         >
-          Download blank template CSV
+          Download blank template (Excel)
         </a>
         <button
           type="button"
@@ -99,7 +99,7 @@ export function MarkerUploadPanel({
           ref={fileRef}
           type="file"
           name="file"
-          accept=".csv,text/csv"
+          accept=".csv,text/csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
           required
           className="text-sm"
         />
@@ -108,7 +108,7 @@ export function MarkerUploadPanel({
           disabled={pending}
           className="rounded bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {pending ? "Submitting…" : "Upload grades CSV"}
+          {pending ? "Submitting…" : "Upload grades"}
         </button>
       </form>
       {summary && (

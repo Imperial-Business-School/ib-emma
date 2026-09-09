@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { findOrCreateUser } from "@/lib/auth";
 import { query, queryOne, randomToken, type Exam } from "@/lib/db";
-import { parseCsv } from "@/lib/csv";
+import { parseTabularFile } from "@/lib/tabular";
 import { parseUkLocalDateTime, todayUkIsoDate } from "@/lib/datetime";
 import {
   buildMarkerEmail,
@@ -562,42 +562,6 @@ export async function reassignMarkerAction(
   ]);
 
   revalidatePath(`/admin/exams/${examId}`);
-}
-
-// Reads an uploaded seats file (either CSV or XLSX) into a
-// tabular string[][]. XLSX is detected by extension/MIME so admins
-// can upload either the .xlsx template we hand them or a CSV they
-// saved out from Excel.
-async function parseTabularFile(file: File): Promise<string[][]> {
-  const name = file.name.toLowerCase();
-  const looksLikeXlsx =
-    name.endsWith(".xlsx") ||
-    file.type ===
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-  if (!looksLikeXlsx) {
-    return parseCsv(await file.text());
-  }
-  // Dynamic import so the ~1MB exceljs bundle only loads on xlsx
-  // uploads and not on every hot page render.
-  const { default: ExcelJS } = await import("exceljs");
-  const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.load(await file.arrayBuffer());
-  const sheet = workbook.worksheets[0];
-  if (!sheet) return [];
-  const rows: string[][] = [];
-  sheet.eachRow({ includeEmpty: false }, (row) => {
-    const cells: string[] = [];
-    // getCell is 1-indexed. actualCellCount tells us how many
-    // columns this row uses; iterate up to that so trailing gaps
-    // don't leak stale references.
-    const width = row.actualCellCount || row.cellCount || 0;
-    for (let c = 1; c <= width; c++) {
-      const value = row.getCell(c).value;
-      cells.push(value == null ? "" : String(value).trim());
-    }
-    rows.push(cells);
-  });
-  return rows;
 }
 
 export async function uploadSeatsAction(examId: number, formData: FormData) {
