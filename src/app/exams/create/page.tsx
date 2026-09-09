@@ -26,7 +26,7 @@ export default async function CreateExamPage() {
         <h1 className="mt-1 text-2xl font-bold">Create exam</h1>
         <p className="mt-1 text-sm text-slate-600">
           Enter both markers, pick a sampling mode, and (if applicable) enable
-          the MCQ element. The sampling mode is locked once primary marking
+          the MCQ element. The sampling mode is locked once first marking
           starts.
         </p>
       </div>

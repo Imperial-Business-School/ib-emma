@@ -58,7 +58,7 @@ export async function GET(
     const header = [
       "Seat number",
       ...(mcqEnabled ? ["MCQ score"] : []),
-      "Primary Marker's grade",
+      "First Marker's grade",
       "Secondary Marker grade",
       "Secondary Marker comments",
     ];

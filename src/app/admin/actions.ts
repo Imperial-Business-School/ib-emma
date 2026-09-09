@@ -74,7 +74,7 @@ export async function createExamAction(formData: FormData) {
   const samplingMode = parseSamplingMode(formData.get("sampling_mode"));
   const primaryDeadline = parseFutureDeadline(
     formData.get("primary_deadline"),
-    "Primary marker deadline",
+    "First marker deadline",
   );
   const secondaryDeadline = parseFutureDeadline(
     formData.get("secondary_deadline"),
@@ -107,7 +107,7 @@ export async function createExamAction(formData: FormData) {
   if (!moduleName) throw new Error("Module name is required");
   if (!code) throw new Error("Module code is required");
   if (!primaryDeadline) {
-    throw new Error("Primary marker deadline is required");
+    throw new Error("First marker deadline is required");
   }
   if (!secondaryDeadline) {
     throw new Error("Second marker deadline is required");
@@ -117,12 +117,12 @@ export async function createExamAction(formData: FormData) {
   const primaryName = String(formData.get("primary_name") ?? "").trim();
   const secondaryEmail = parseEmail(formData.get("secondary_email"));
   const secondaryName = String(formData.get("secondary_name") ?? "").trim();
-  if (!primaryName) throw new Error("Primary marker name is required");
+  if (!primaryName) throw new Error("First marker name is required");
   if (!secondaryName) throw new Error("Second marker name is required");
 
   if (primaryEmail === secondaryEmail) {
     throw new Error(
-      "Primary and secondary markers must have different email addresses",
+      "First and second markers must have different email addresses",
     );
   }
 
@@ -170,7 +170,7 @@ export async function resetSeatsAction(examId: number) {
   if (!exam) throw new Error("Exam not found");
   if (exam.status !== "setup") {
     throw new Error(
-      "Seat list can only be reset before primary marking begins",
+      "Seat list can only be reset before first marking begins",
     );
   }
   await query("DELETE FROM submissions WHERE exam_id = $1", [examId]);
@@ -375,7 +375,7 @@ export async function updatePrimaryDeadlineAction(
   await requireAdmin();
   const deadline = parseFutureDeadline(
     formData.get("primary_deadline"),
-    "Primary marker deadline",
+    "First marker deadline",
   );
   // Also snap status out of overdue/late so the sweep can re-diagnose
   // against the new date. Other statuses are left alone.
@@ -437,10 +437,10 @@ export async function reassignMarkerAction(
   const user = await findOrCreateUser(email, name);
 
   if (role === "primary" && user.id === exam.secondary_marker_id) {
-    throw new Error("Primary and secondary markers must be different people");
+    throw new Error("First and second markers must be different people");
   }
   if (role === "secondary" && user.id === exam.primary_marker_id) {
-    throw new Error("Primary and secondary markers must be different people");
+    throw new Error("First and second markers must be different people");
   }
 
   const column =
@@ -603,7 +603,7 @@ export async function startPrimaryMarkingAction(examId: number) {
     throw new Error("Marking has already started for this exam");
   }
   if (!exam.primary_marker_id) {
-    throw new Error("Primary marker is not set");
+    throw new Error("First marker is not set");
   }
 
   const seats = await queryOne<{ n: number }>(
@@ -623,7 +623,7 @@ export async function startPrimaryMarkingAction(examId: number) {
     );
     if ((missing?.n ?? 0) > 0) {
       throw new Error(
-        `MCQ is enabled: ${missing?.n} student(s) still need an MCQ score before primary marking can start.`,
+        `MCQ is enabled: ${missing?.n} student(s) still need an MCQ score before first marking can start.`,
       );
     }
   }

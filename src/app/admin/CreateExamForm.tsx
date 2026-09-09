@@ -37,7 +37,7 @@ export function CreateExamForm({
     setError(null);
     if (emailsMatch) {
       e.preventDefault();
-      setError("Primary and secondary markers must be different people.");
+      setError("First and second markers must be different people.");
       return;
     }
     if (mcqEnabled) {
@@ -186,8 +186,8 @@ export function CreateExamForm({
             className="mt-1"
           />
           <span>
-            <strong>Standard sampling</strong> — bracket-aware sample plus all
-            failed students (see docs for full rules).
+            <strong>Standard sampling</strong> — min 10%, threshold grades,
+            all fails (see documentation for more info)
           </span>
         </label>
         <label className="mt-2 flex items-start gap-2 text-sm">
@@ -198,14 +198,14 @@ export function CreateExamForm({
             className="mt-1"
           />
           <span>
-            <strong>Full second marking</strong> — every paper is marked by the
-            second marker.
+            <strong>Full second marking</strong> — second marker grades every
+            paper
           </span>
         </label>
       </fieldset>
       <div className="rounded border bg-slate-50 p-3">
         <p className="text-xs font-semibold uppercase text-slate-500">
-          Primary marker
+          First marker
         </p>
         <input
           type="email"
@@ -213,7 +213,7 @@ export function CreateExamForm({
           required
           value={primaryEmail}
           onChange={(e) => setPrimaryEmail(e.target.value)}
-          placeholder="primary@imperial.ac.uk"
+          placeholder="first@imperial.ac.uk"
           className="mt-2 w-full rounded border px-3 py-2 text-sm"
         />
         <input
@@ -244,13 +244,13 @@ export function CreateExamForm({
         />
         {emailsMatch && (
           <p className="mt-1 text-xs text-red-700">
-            Second marker email cannot match primary marker email.
+            Second marker email cannot match first marker email.
           </p>
         )}
       </div>
       <label className="text-sm md:col-span-2">
         <span className="block text-xs font-medium text-slate-600">
-          Primary marker deadline
+          First marker deadline
         </span>
         <input
           type="date"

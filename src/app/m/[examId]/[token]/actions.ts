@@ -122,7 +122,7 @@ export async function saveGradesByTokenAction(
         const c = (u.comment ?? "").trim();
         if (c === "") {
           throw new Error(
-            `Seat ${row.id}: your grade differs from the primary marker's, please add a comment before saving.`,
+            `Seat ${row.id}: your grade differs from the first marker's, please add a comment before saving.`,
           );
         }
       }
@@ -413,7 +413,7 @@ export async function uploadGradesCsvByTokenAction(
         : (row.secondary_comment ?? "");
       if (effective.trim() === "") {
         skipped.push(
-          `Seat ${seat}: your grade differs from the primary marker's, please add a comment before saving.`,
+          `Seat ${seat}: your grade differs from the first marker's, please add a comment before saving.`,
         );
         continue;
       }
@@ -519,9 +519,9 @@ export async function completePrimaryMarkingByTokenAction(
   token: string,
 ) {
   const { exam, role } = await authorize(examId, token);
-  if (role !== "primary") throw new Error("Primary marker only");
+  if (role !== "primary") throw new Error("First marker only");
   if (!isPrimaryMarkingPhase(exam.status)) {
-    throw new Error("Primary marking is not currently in progress");
+    throw new Error("First marking is not currently in progress");
   }
 
   // Only non-absent students need grades and are eligible for sampling.
@@ -604,7 +604,7 @@ export async function completeSecondaryMarkingByTokenAction(
   );
   if (missing && missing.n > 0) {
     throw new Error(
-      `${missing.n} sampled seat(s) have a grade that differs from the primary marker's but no comment. Add a comment explaining the discrepancy before submitting.`,
+      `${missing.n} sampled seat(s) have a grade that differs from the first marker's but no comment. Add a comment explaining the discrepancy before submitting.`,
     );
   }
 
@@ -656,7 +656,7 @@ export async function completeFinalMarkingByTokenAction(
   token: string,
 ) {
   const { exam, role } = await authorize(examId, token);
-  if (role !== "primary") throw new Error("Primary marker only");
+  if (role !== "primary") throw new Error("First marker only");
   if (exam.status !== "review") {
     throw new Error("Final marking is not currently in progress");
   }

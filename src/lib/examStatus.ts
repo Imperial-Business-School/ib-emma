@@ -42,7 +42,7 @@ export type Admin = {
 
 export const EXAM_STATUS_LABEL: Record<ExamStatus, string> = {
   setup: "Setup",
-  primary_marking: "Primary marking in progress",
+  primary_marking: "First marking in progress",
   first_marking_overdue: "First marking overdue",
   first_marking_late: "First marking late",
   first_marking_review: "First marking complete — ready for admin review",

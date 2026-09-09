@@ -279,13 +279,13 @@ export function GradeTable({
             )}
             {showPrimary && (
               <SortableTh
-                label="Primary grade"
+                label="First grade"
                 active={sort.key === "primary_grade"}
                 dir={sort.dir}
                 onClick={() => onSort("primary_grade")}
               />
             )}
-            {isResolving && <th className="px-4 py-2">Primary comment</th>}
+            {isResolving && <th className="px-4 py-2">First comment</th>}
             {showSecondary && <th className="px-4 py-2">Secondary grade</th>}
             {isResolving && <th className="px-4 py-2">Secondary comment</th>}
             {mcqAfterPrimary && (
@@ -415,7 +415,7 @@ export function GradeTable({
                       placeholder={commentRequired ? "required" : "optional"}
                       title={
                         commentRequired
-                          ? "Your grade differs from the primary marker's — a comment is required."
+                          ? "Your grade differs from the first marker's — a comment is required."
                           : undefined
                       }
                       maxLength={250}

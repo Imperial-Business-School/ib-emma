@@ -165,7 +165,7 @@ export function buildMarkerEmail(opts: {
   const deadlineLine = opts.deadline
     ? `Deadline: end of ${formatDateOnly(opts.deadline)} (UK time)`
     : "Deadline: not set";
-  const roleLabel = opts.role === "primary" ? "primary" : "second";
+  const roleLabel = opts.role === "primary" ? "first" : "second";
 
   if (opts.kind === "commence") {
     return {
@@ -190,8 +190,8 @@ export function buildMarkerEmail(opts: {
   const urgent = true;
   const subject =
     opts.kind === "overdue"
-      ? `URGENT: ${roleLabel === "primary" ? "First" : "Second"} marking overdue — ${examLabel}`
-      : `URGENT: ${roleLabel === "primary" ? "First" : "Second"} marking late — ${examLabel}`;
+      ? `URGENT: ${roleLabel === "first" ? "First" : "Second"} marking overdue — ${examLabel}`
+      : `URGENT: ${roleLabel === "first" ? "First" : "Second"} marking late — ${examLabel}`;
 
   const cc = opts.kind === "late" ? "exam.manager@ic.ac.uk" : undefined;
 

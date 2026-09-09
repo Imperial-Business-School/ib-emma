@@ -192,7 +192,7 @@ export default async function MarkerByTokenPage({
     ? "Discrepancies to review"
     : isSecondary
       ? "second marker"
-      : "primary marker";
+      : "first marker";
 
   return (
     <div className="space-y-8">
@@ -252,7 +252,7 @@ export default async function MarkerByTokenPage({
                       ? "Thanks. The second marker is now reviewing a sample of your grades."
                       : "Thanks. This exam is now complete."
                   : exam.status === "review"
-                    ? "Thanks. The primary marker is reviewing any discrepancies between your grades and theirs."
+                    ? "Thanks. The first marker is reviewing any discrepancies between your grades and theirs."
                     : "Thanks. This exam is now complete."}
               </p>
             </div>
@@ -268,7 +268,7 @@ export default async function MarkerByTokenPage({
             (exam.status === "setup" ||
               exam.status === "primary_marking" ||
               exam.status === "first_marking_review") && (
-              <>The primary marker is still working, or the admin is reviewing the sample. You&apos;ll be notified when it&apos;s your turn.</>
+              <>The first marker is still working, or the admin is reviewing the sample. You&apos;ll be notified when it&apos;s your turn.</>
             )}
           {exam.status === "complete" && (
             <>This exam is closed for marker edits.</>
@@ -351,13 +351,13 @@ export default async function MarkerByTokenPage({
                 <p className="mt-2 text-xs text-red-700">
                   {secondaryMismatchesMissingComment} sampled seat
                   {secondaryMismatchesMissingComment === 1 ? "" : "s"} have a
-                  grade that differs from the primary marker&apos;s but no
+                  grade that differs from the first marker&apos;s but no
                   comment. Add a comment on each — on the page or via a CSV
                   upload — before submitting.
                 </p>
               )}
               <p className="mt-2 text-xs text-slate-500">
-                Locks in your grades. The primary marker will be asked to
+                Locks in your grades. The first marker will be asked to
                 resolve any discrepancies.
               </p>
             </CompleteMarkingButton>

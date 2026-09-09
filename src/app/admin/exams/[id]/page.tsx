@@ -254,10 +254,10 @@ export default async function AdminExamPage({
       {exam.status === "review" && (
         <div className="rounded-lg border border-amber-300 bg-amber-50 p-4">
           <h3 className="font-semibold text-amber-900">
-            Awaiting primary marker review of discrepancies
+            Awaiting first marker review of discrepancies
           </h3>
           <p className="mt-1 text-sm text-amber-800">
-            The primary marker has been notified to resolve each discrepancy
+            The first marker has been notified to resolve each discrepancy
             below. When they finish, the exam returns to <em>Ready for Canvas upload</em>.
           </p>
         </div>
@@ -285,7 +285,7 @@ export default async function AdminExamPage({
       <section className="grid gap-4 md:grid-cols-2">
         <div className="rounded-lg border bg-white p-4 shadow-sm">
           <p className="text-xs font-semibold uppercase text-slate-500">
-            Primary marker deadline
+            First marker deadline
           </p>
           {exam.primary_deadline_date && (
             <p className="mt-1 font-medium">
@@ -346,12 +346,12 @@ export default async function AdminExamPage({
               className="mt-6 border-t pt-4"
             >
               <SubmitButton
-                label="Start primary marking"
+                label="Start first marking"
                 className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-400"
               />
               <p className="mt-2 text-xs text-slate-500">
-                Sampling mode locks at this point. Send the primary marker URL
-                shown above to {primaryMarker?.email ?? "the primary marker"}.
+                Sampling mode locks at this point. Send the first marker URL
+                shown above to {primaryMarker?.email ?? "the first marker"}.
               </p>
             </form>
           )}
@@ -451,7 +451,7 @@ export default async function AdminExamPage({
               )}
               <th className="px-4 py-2">
                 <SeatSortHeader
-                  label="Primary grade"
+                  label="First grade"
                   asc="grade_asc"
                   desc="grade_desc"
                   current={seatSort}
@@ -647,7 +647,7 @@ export default async function AdminExamPage({
                           inputMode="decimal"
                           title={
                             needsResolution
-                              ? "Awaiting primary marker resolution — admin can also enter a final grade here"
+                              ? "Awaiting first marker resolution — admin can also enter a final grade here"
                               : (s.override_note ??
                                 "Admin override — type a new grade and save")
                           }
@@ -721,7 +721,7 @@ function MarkerCard({
   shareUrl: string | null;
   status: Exam["status"];
 }) {
-  const heading = role === "primary" ? "Primary marker" : "Second marker";
+  const heading = role === "primary" ? "First marker" : "Second marker";
   const activeNow =
     (role === "primary" &&
       (status === "primary_marking" || status === "review")) ||
@@ -729,12 +729,12 @@ function MarkerCard({
   const hint =
     role === "primary"
       ? status === "setup"
-        ? "Send once you click Start primary marking."
+        ? "Send once you click Start first marking."
         : status === "primary_marking"
-          ? "Send this URL to the primary marker."
+          ? "Send this URL to the first marker."
           : status === "review"
-            ? "Send this URL to the primary marker to resolve discrepancies."
-            : "Primary marking is finished."
+            ? "Send this URL to the first marker to resolve discrepancies."
+            : "First marking is finished."
       : status === "setup" ||
           status === "primary_marking" ||
           status === "first_marking_review"
