@@ -95,7 +95,7 @@ export default async function AdminExamPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ sort?: string }>;
+  searchParams: Promise<{ sort?: string; started?: string }>;
 }) {
   const { id } = await params;
   const sp = await searchParams;
@@ -150,9 +150,18 @@ export default async function AdminExamPage({
     exam.status === "setup" && totalSeats > 0 && exam.primary_marker_id;
   const isFirstMarkingReview = exam.status === "first_marking_review";
   const canDownloadCsv = exam.status === "complete";
+  const justStarted =
+    sp.started === "1" && exam.status === "primary_marking";
 
   return (
     <div className="space-y-8">
+      {justStarted && (
+        <div className="rounded-lg border border-green-300 bg-green-50 p-5 text-center shadow-sm">
+          <p className="text-lg font-semibold text-green-800">
+            Exam setup complete. First marking in progress.
+          </p>
+        </div>
+      )}
       <div className="flex items-start justify-between">
         <div>
           <Link href="/admin" className="text-sm text-blue-600 hover:underline">

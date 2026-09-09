@@ -766,6 +766,9 @@ export async function startPrimaryMarkingAction(examId: number) {
   }
 
   revalidatePath(`/admin/exams/${examId}`);
+  // Redirect so the browser navigates to a fresh URL, scrolling to the
+  // top and letting the page show a banner keyed off ?started=1.
+  redirect(`/admin/exams/${examId}?started=1`);
 }
 
 export async function toggleInSampleAction(
