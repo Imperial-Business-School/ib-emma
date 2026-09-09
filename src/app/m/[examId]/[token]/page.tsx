@@ -5,6 +5,7 @@ import {
   type Exam,
   type Programme,
   type Submission,
+  type User,
 } from "@/lib/db";
 import { SEAT_ORDER_ASC } from "@/lib/seatSort";
 import {
@@ -55,6 +56,17 @@ export default async function MarkerByTokenPage({
         exam.programme_id,
       ])) ?? null)
     : null;
+
+  const markerUserId =
+    role === "primary"
+      ? exam.primary_marker_id
+      : exam.secondary_marker_id;
+  const markerUser = markerUserId
+    ? ((await queryOne<User>("SELECT * FROM users WHERE id = $1", [
+        markerUserId,
+      ])) ?? null)
+    : null;
+  const markerDisplayName = markerUser?.name ?? markerUser?.email ?? null;
 
   const isPrimary = role === "primary";
   const isSecondary = role === "secondary";
@@ -234,7 +246,16 @@ export default async function MarkerByTokenPage({
           </p>
         ) : (
           <p className="mt-2 text-sm text-slate-600">
-            You are the <strong>{headerText}</strong>. {graded} of {total}{" "}
+            {markerDisplayName && <>Hello, {markerDisplayName}. </>}
+            You are the <strong>{headerText}</strong>.
+            {markerDisplayName && (
+              <>
+                {" "}
+                If you are not {markerDisplayName}, please close this window
+                and contact the Exams team.
+              </>
+            )}{" "}
+            {graded} of {total}{" "}
             {isSecondary ? "sampled seats" : "seats"} graded.
           </p>
         )}
