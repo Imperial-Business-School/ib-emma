@@ -286,7 +286,7 @@ export function CreateExamForm({
           name="primary_deadline"
           min={today}
           required
-          className="mt-1 w-full rounded border px-3 py-2 text-sm"
+          className="mt-1 w-48 rounded border px-3 py-2 text-sm"
         />
         <span className="mt-1 block text-xs text-slate-500">
           Set to 10:00 UK time on this date. Must be on or after the exam
@@ -302,7 +302,7 @@ export function CreateExamForm({
           name="secondary_deadline"
           min={today}
           required
-          className="mt-1 w-full rounded border px-3 py-2 text-sm"
+          className="mt-1 w-48 rounded border px-3 py-2 text-sm"
         />
         <span className="mt-1 block text-xs text-slate-500">
           Must be on or after the first marker deadline.
