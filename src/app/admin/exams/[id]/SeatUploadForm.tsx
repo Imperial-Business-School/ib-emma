@@ -33,7 +33,7 @@ export function SeatUploadForm({ examId }: { examId: number }) {
         <input
           type="file"
           name="file"
-          accept=".csv,text/csv"
+          accept=".csv,text/csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
           required
           className="text-sm"
         />

@@ -358,7 +358,7 @@ export default async function AdminExamPage({
         <section className="rounded-lg border bg-white p-6 shadow-sm">
           <h2 className="text-lg font-semibold">Seats (seat → CID)</h2>
           <p className="mt-1 text-sm text-slate-600">
-            Upload a two-column CSV (<code>Seat number</code>, <code>CID</code>)
+            Upload a two-column file (<code>Seat number</code>, <code>CID</code>)
             using the template linked below. Alternatively, students can be
             added individually.
             <br />
@@ -368,10 +368,10 @@ export default async function AdminExamPage({
           </p>
           <div className="mt-2 flex flex-wrap items-center gap-3">
             <a
-              href={`/api/exams/${exam.id}/seats-template.csv`}
+              href={`/api/exams/${exam.id}/seats-template.xlsx`}
               className="text-xs text-blue-600 hover:underline"
             >
-              Download blank template CSV
+              Download blank template (Excel)
             </a>
             <ResetSeatsForm examId={exam.id} count={totalSeats} />
           </div>
