@@ -260,18 +260,23 @@ export function GradeTable({
     statN > 0
       ? savedWeighted.reduce((a, b) => a + b, 0) / statN
       : null;
+  // Population standard deviation (divide by N, not N-1) -- treats
+  // the saved grades as the whole population, not a sample from a
+  // larger one. Undefined when the marker has fewer than 2 saved
+  // grades, in which case we render "N/A".
   const statStd =
-    statN > 1 && statMean != null
+    statN >= 2 && statMean != null
       ? Math.sqrt(
           savedWeighted.reduce(
             (a, b) => a + (b - statMean) * (b - statMean),
             0,
-          ) /
-            (statN - 1),
+          ) / statN,
         )
       : null;
-  const fmtStat = (n: number | null) =>
-    n == null ? "—" : n.toFixed(2);
+  const fmtMean = (n: number | null) =>
+    n == null ? "N/A" : n.toFixed(2);
+  const fmtStd = (n: number | null) =>
+    n == null ? "N/A" : n.toFixed(2);
 
   return (
     <section className="rounded-lg border bg-white shadow-sm">
@@ -537,7 +542,7 @@ export function GradeTable({
             ) : null}
             :{" "}
             <span className="font-semibold text-slate-900">
-              {fmtStat(statMean)}
+              {fmtMean(statMean)}
             </span>
           </span>
           <span>
@@ -547,7 +552,7 @@ export function GradeTable({
             ) : null}
             :{" "}
             <span className="font-semibold text-slate-900">
-              {fmtStat(statStd)}
+              {fmtStd(statStd)}
             </span>
           </span>
           <span className="text-slate-500">
