@@ -77,21 +77,13 @@ export function MarkerUploadPanel({
         (second marker). Rows for students marked absent by the admin
         are ignored; the rest are saved.
       </p>
-      <div className="mt-3 flex flex-wrap items-center gap-3">
+      <div className="mt-3">
         <a
           href={`/api/m/${examId}/${token}/grades-template.xlsx`}
           className="text-xs text-blue-600 hover:underline"
         >
           Download blank template (Excel)
         </a>
-        <button
-          type="button"
-          onClick={onClear}
-          disabled={pending}
-          className="rounded border border-red-300 bg-white px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          Clear all my grades
-        </button>
       </div>
       <form
         onSubmit={onUpload}
@@ -121,6 +113,16 @@ export function MarkerUploadPanel({
           {error}
         </pre>
       )}
+      <div className="mt-6 flex justify-end">
+        <button
+          type="button"
+          onClick={onClear}
+          disabled={pending}
+          className="rounded border border-red-300 bg-white px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Clear all my grades
+        </button>
+      </div>
     </section>
   );
 }
