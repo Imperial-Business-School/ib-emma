@@ -431,7 +431,7 @@ export default async function AdminExamPage({
               )}
               <th className="px-4 py-2">
                 <SeatSortHeader
-                  label="First grade"
+                  label="First marker grade"
                   asc="grade_asc"
                   desc="grade_desc"
                   current={seatSort}
@@ -442,7 +442,7 @@ export default async function AdminExamPage({
               <th className="px-4 py-2 text-center">Sample</th>
               <th className="px-4 py-2">
                 <SeatSortHeader
-                  label="Secondary grade"
+                  label="Second marker grade"
                   asc="secondary_asc"
                   desc="secondary_desc"
                   current={seatSort}
