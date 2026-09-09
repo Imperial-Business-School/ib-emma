@@ -378,25 +378,6 @@ export default async function AdminExamPage({
           <SeatUploadForm examId={exam.id} />
 
           <AddSeatForm examId={exam.id} />
-
-          {canStartMarking && (
-            <form
-              action={async () => {
-                "use server";
-                await startPrimaryMarkingAction(exam.id);
-              }}
-              className="mt-6 border-t pt-4"
-            >
-              <SubmitButton
-                label="Start first marking"
-                className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-400"
-              />
-              <p className="mt-2 text-xs text-slate-500">
-                Sampling mode locks at this point. Send the first marker URL
-                shown above to {primaryMarker?.email ?? "the first marker"}.
-              </p>
-            </form>
-          )}
         </section>
       )}
 
@@ -733,6 +714,26 @@ export default async function AdminExamPage({
           </tbody>
         </table>
       </section>
+
+      {canStartMarking && (
+        <section className="rounded-lg border bg-white p-6 shadow-sm">
+          <form
+            action={async () => {
+              "use server";
+              await startPrimaryMarkingAction(exam.id);
+            }}
+          >
+            <SubmitButton
+              label="Start first marking"
+              className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-400"
+            />
+            <p className="mt-2 text-xs text-slate-500">
+              Sampling mode locks at this point. Send the first marker URL
+              shown above to {primaryMarker?.email ?? "the first marker"}.
+            </p>
+          </form>
+        </section>
+      )}
 
       <section className="border-t pt-6">
         <details className="text-sm">
