@@ -62,6 +62,13 @@ function parseType(v: string | undefined): ExamType | null {
   return null;
 }
 
+// Accepts strict YYYY-MM-DD and returns it, else null. Prevents any
+// malformed input from reaching the SQL layer.
+function parseIsoDate(v: string | undefined): string | null {
+  if (!v) return null;
+  return /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null;
+}
+
 export default async function ExamsListPage({
   searchParams,
 }: {
@@ -74,6 +81,8 @@ export default async function ExamsListPage({
     programme?: string;
     year?: string;
     type?: string;
+    date_from?: string;
+    date_to?: string;
   }>;
 }) {
   await sweepDeadlineStatuses({ origin: await getOrigin() });
@@ -91,6 +100,8 @@ export default async function ExamsListPage({
   const academicYear =
     sp.year && /^\d{2}\/\d{2}$/.test(sp.year.trim()) ? sp.year.trim() : null;
   const type = parseType(sp.type);
+  const dateFrom = parseIsoDate(sp.date_from);
+  const dateTo = parseIsoDate(sp.date_to);
 
   // Options for the filter dropdowns. Academic-year list comes from the
   // exams actually stored (distinct, newest first).
@@ -129,6 +140,14 @@ export default async function ExamsListPage({
     whereParams.push(type === "resit");
     whereParts.push(`e.is_resit = $${whereParams.length}`);
   }
+  if (dateFrom) {
+    whereParams.push(dateFrom);
+    whereParts.push(`e.exam_date >= $${whereParams.length}`);
+  }
+  if (dateTo) {
+    whereParams.push(dateTo);
+    whereParts.push(`e.exam_date <= $${whereParams.length}`);
+  }
   const whereSql = whereParts.length ? `WHERE ${whereParts.join(" AND ")}` : "";
 
   const totalRow = await queryOne<{ n: number }>(
@@ -162,6 +181,8 @@ export default async function ExamsListPage({
     if (programmeId != null) params.set("programme", String(programmeId));
     if (academicYear) params.set("year", academicYear);
     if (type) params.set("type", type);
+    if (dateFrom) params.set("date_from", dateFrom);
+    if (dateTo) params.set("date_to", dateTo);
     for (const [k, v] of Object.entries(overrides)) {
       if (v == null || v === "") params.delete(k);
       else params.set(k, String(v));
@@ -198,6 +219,8 @@ export default async function ExamsListPage({
         initialProgrammeId={programmeId ?? "all"}
         initialAcademicYear={academicYear ?? "all"}
         initialType={type ?? "all"}
+        initialDateFrom={dateFrom ?? ""}
+        initialDateTo={dateTo ?? ""}
         programmes={programmes}
         academicYears={academicYears}
       />

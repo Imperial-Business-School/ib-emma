@@ -31,6 +31,8 @@ export function ExamFilters({
   initialProgrammeId,
   initialAcademicYear,
   initialType,
+  initialDateFrom,
+  initialDateTo,
   programmes,
   academicYears,
 }: {
@@ -41,6 +43,8 @@ export function ExamFilters({
   initialProgrammeId: number | "all";
   initialAcademicYear: string | "all";
   initialType: ExamType | "all";
+  initialDateFrom: string;
+  initialDateTo: string;
   programmes: ProgrammeOption[];
   academicYears: string[];
 }) {
@@ -56,6 +60,8 @@ export function ExamFilters({
   const [academicYear, setAcademicYear] =
     useState<string | "all">(initialAcademicYear);
   const [type, setType] = useState<ExamType | "all">(initialType);
+  const [dateFrom, setDateFrom] = useState(initialDateFrom);
+  const [dateTo, setDateTo] = useState(initialDateTo);
 
   // Debounce the text input so typing doesn't refetch on every keystroke.
   const [debouncedQ, setDebouncedQ] = useState(q);
@@ -73,13 +79,25 @@ export function ExamFilters({
     if (programmeId !== "all") params.set("programme", String(programmeId));
     if (academicYear !== "all") params.set("year", academicYear);
     if (type !== "all") params.set("type", type);
+    if (dateFrom) params.set("date_from", dateFrom);
+    if (dateTo) params.set("date_to", dateTo);
     const qs = params.toString();
     startTransition(() => {
       router.replace(qs ? `/exams?${qs}` : "/exams");
     });
     // intentional: react to filter state only
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedQ, status, sort, pageSize, programmeId, academicYear, type]);
+  }, [
+    debouncedQ,
+    status,
+    sort,
+    pageSize,
+    programmeId,
+    academicYear,
+    type,
+    dateFrom,
+    dateTo,
+  ]);
 
   return (
     <section className="rounded-lg border bg-white p-4 shadow-sm">
@@ -142,6 +160,42 @@ export function ExamFilters({
           <option value="main">Main sitting</option>
           <option value="resit">Resit</option>
         </select>
+        <label className="flex items-center gap-1 text-xs text-slate-500">
+          <span>Exam from</span>
+          <input
+            type="date"
+            value={dateFrom}
+            max={dateTo || undefined}
+            onChange={(e) => setDateFrom(e.target.value)}
+            aria-label="Filter exams from date"
+            className="rounded border bg-white px-2 py-1 text-sm text-slate-900"
+          />
+        </label>
+        <label className="flex items-center gap-1 text-xs text-slate-500">
+          <span>to</span>
+          <input
+            type="date"
+            value={dateTo}
+            min={dateFrom || undefined}
+            onChange={(e) => setDateTo(e.target.value)}
+            aria-label="Filter exams to date"
+            className="rounded border bg-white px-2 py-1 text-sm text-slate-900"
+          />
+          {(dateFrom || dateTo) && (
+            <button
+              type="button"
+              onClick={() => {
+                setDateFrom("");
+                setDateTo("");
+              }}
+              aria-label="Clear exam date range"
+              title="Clear exam date range"
+              className="rounded border bg-white px-2 py-1 text-xs text-slate-600 hover:bg-slate-50"
+            >
+              Clear
+            </button>
+          )}
+        </label>
         <select
           value={sort}
           onChange={(e) => setSort(e.target.value as Sort)}
