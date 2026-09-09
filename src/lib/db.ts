@@ -154,6 +154,34 @@ async function initSchema(): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_email_log_recipient ON email_log(lower(recipient));
     CREATE INDEX IF NOT EXISTS idx_email_log_exam ON email_log(exam_id);
 
+    -- One-off migration: back-fill the "primary"/"secondary" wording in
+    -- historical email_log rows so the log matches the new "first"/"second"
+    -- terminology used in freshly-built emails. Idempotent: the WHERE
+    -- clauses skip rows that have already been migrated, so subsequent
+    -- cold starts are no-ops.
+    UPDATE email_log
+    SET kind = 'first' || substring(kind from 8)
+    WHERE kind LIKE 'primary\_%' ESCAPE '\';
+    UPDATE email_log
+    SET kind = 'second' || substring(kind from 10)
+    WHERE kind LIKE 'secondary\_%' ESCAPE '\';
+    UPDATE email_log
+    SET subject = replace(replace(subject,
+                          'Primary marking', 'First marking'),
+                          'Secondary marking', 'Second marking')
+    WHERE subject LIKE '%Primary marking%'
+       OR subject LIKE '%Secondary marking%';
+    UPDATE email_log
+    SET body = replace(replace(replace(replace(body,
+                       'primary marker', 'first marker'),
+                       'secondary marker', 'second marker'),
+                       'primary marking', 'first marking'),
+                       'secondary marking', 'second marking')
+    WHERE body LIKE '%primary marker%'
+       OR body LIKE '%secondary marker%'
+       OR body LIKE '%primary marking%'
+       OR body LIKE '%secondary marking%';
+
     CREATE TABLE IF NOT EXISTS programmes (
       id SERIAL PRIMARY KEY,
       name TEXT NOT NULL,

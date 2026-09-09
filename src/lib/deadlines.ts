@@ -171,7 +171,7 @@ export function buildMarkerEmail(opts: {
     return {
       to: opts.markerEmail,
       subject: `Marking ready: ${examLabel}`,
-      kind: `${opts.role}_commence`,
+      kind: `${roleLabel}_commence`,
       examId: opts.examId ?? null,
       body: [
         greeting,
@@ -200,7 +200,7 @@ export function buildMarkerEmail(opts: {
     cc,
     urgent,
     subject,
-    kind: `${opts.role}_${opts.kind}`,
+    kind: `${roleLabel}_${opts.kind}`,
     examId: opts.examId ?? null,
     body: [
       greeting,
