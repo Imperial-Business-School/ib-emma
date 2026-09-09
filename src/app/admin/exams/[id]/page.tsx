@@ -377,8 +377,6 @@ export default async function AdminExamPage({
               <ResetSeatsForm examId={exam.id} count={totalSeats} />
             </div>
             <SeatUploadForm examId={exam.id} />
-
-            <AddSeatForm examId={exam.id} />
           </div>
         )}
         <div className="border-b px-4 py-3">
@@ -671,6 +669,11 @@ export default async function AdminExamPage({
             })}
           </tbody>
         </table>
+        {exam.status === "setup" && (
+          <div className="border-t p-4">
+            <AddSeatForm examId={exam.id} />
+          </div>
+        )}
       </section>
 
       {exam.mcq_enabled && (
