@@ -16,7 +16,7 @@ export default async function AdminChrome({
   return (
     <>
       <header className="border-b bg-white">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+        <div className="mx-auto flex max-w-screen-2xl items-center justify-between px-6 py-4">
           <Link
             href="/admin"
             className="flex items-baseline gap-2 text-lg font-semibold"
@@ -56,7 +56,7 @@ export default async function AdminChrome({
           </nav>
         </div>
       </header>
-      <main className="mx-auto max-w-6xl px-6 py-8">
+      <main className="mx-auto max-w-screen-2xl px-6 py-8">
         {authEnforced() && !current ? <NotAuthorised /> : children}
       </main>
     </>

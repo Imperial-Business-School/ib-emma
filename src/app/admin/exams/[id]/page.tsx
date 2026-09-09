@@ -396,7 +396,7 @@ export default async function AdminExamPage({
           </p>
         </div>
         <div className="overflow-x-auto">
-        <table className="w-full min-w-max text-sm">
+        <table className="w-full text-sm [&_td]:px-3 [&_th]:px-3">
           <thead className="border-b bg-slate-50 text-left text-slate-600">
             <tr>
               <th className="px-4 py-2">
