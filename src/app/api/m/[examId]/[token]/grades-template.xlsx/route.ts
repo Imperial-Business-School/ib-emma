@@ -9,15 +9,16 @@ export const dynamic = "force-dynamic";
 // Token-scoped grades template.
 //
 // First marker: every non-absent seat, columns Seat number / Grade /
-// Comments (with an MCQ score reference column inserted when the exam
-// has MCQ enabled).
+// Feedback (with an MCQ score reference column inserted when the exam
+// has MCQ enabled). The first marker leaves Feedback; the second
+// marker leaves Comments.
 //
 // Second marker: only the seats in their assigned sample, columns
-// Seat number / First Marker's grade / Secondary Marker grade /
-// Secondary Marker comments (with an MCQ score reference column
-// inserted when the exam has MCQ enabled). The first marker's grade
-// column is populated for reference so the second marker can compare
-// while filling in their own grade.
+// Seat number / First Marker's grade / First Marker's feedback /
+// Secondary Marker grade / Comments (with an MCQ score reference
+// column inserted when the exam has MCQ enabled). The first marker's
+// grade and feedback columns are populated for reference so the second
+// marker can weigh both while filling in their own grade.
 //
 // All numeric-looking columns (Seat number, MCQ score, grades) are
 // formatted as Text ("@") so Excel doesn't strip a leading zero from
@@ -54,9 +55,10 @@ export async function GET(
     const seats = await query<{
       seat_number: string;
       grade: string | null;
+      primary_comment: string | null;
       mcq_score: string | null;
     }>(
-      `SELECT seat_number, grade, mcq_score FROM submissions
+      `SELECT seat_number, grade, primary_comment, mcq_score FROM submissions
        WHERE exam_id = $1 AND in_sample = true AND absent = false
        ORDER BY ${SEAT_ORDER_ASC}`,
       [examId],
@@ -67,8 +69,13 @@ export async function GET(
         ? [{ header: "MCQ score", key: "mcq", ...textCol }]
         : []),
       { header: "First Marker's grade", key: "primary_grade", ...textCol },
+      {
+        header: "First Marker's feedback",
+        key: "primary_feedback",
+        width: 40,
+      },
       { header: "Secondary Marker grade", key: "grade", ...textCol },
-      { header: "Secondary Marker comments", key: "comment", width: 40 },
+      { header: "Comments", key: "comment", width: 40 },
     ];
     for (const s of seats) {
       sheet.addRow(
@@ -77,12 +84,14 @@ export async function GET(
               seat: s.seat_number,
               mcq: s.mcq_score ?? "",
               primary_grade: s.grade ?? "",
+              primary_feedback: s.primary_comment ?? "",
               grade: "",
               comment: "",
             }
           : {
               seat: s.seat_number,
               primary_grade: s.grade ?? "",
+              primary_feedback: s.primary_comment ?? "",
               grade: "",
               comment: "",
             },
@@ -104,7 +113,7 @@ export async function GET(
         ? [{ header: "MCQ score", key: "mcq", ...textCol }]
         : []),
       { header: "Grade", key: "grade", ...textCol },
-      { header: "Comments", key: "comment", width: 40 },
+      { header: "Feedback", key: "comment", width: 40 },
     ];
     for (const s of seats) {
       sheet.addRow(

@@ -72,8 +72,10 @@ export function MarkerUploadPanel({
       <h2 className="text-lg font-semibold">Bulk actions</h2>
       <p className="mt-1 text-sm text-slate-600">
         Upload grades with columns <code>Seat number</code>,{" "}
-        <code>Grade</code>, <code>Comments</code>. Rows for students marked
-        absent by the admin are ignored; the rest are saved.
+        <code>Grade</code>, and either{" "}
+        <code>Feedback</code> (first marker) or <code>Comments</code>{" "}
+        (second marker). Rows for students marked absent by the admin
+        are ignored; the rest are saved.
       </p>
       <div className="mt-3 flex flex-wrap items-center gap-3">
         <a

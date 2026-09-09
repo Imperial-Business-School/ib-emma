@@ -463,7 +463,7 @@ export default async function AdminExamPage({
                   buildHref={(s) => `/admin/exams/${exam.id}?sort=${s}`}
                 />
               </th>
-              <th className="px-4 py-2">Comment</th>
+              <th className="px-4 py-2">Feedback</th>
               <th className="px-4 py-2 text-center">Sample</th>
               <th className="px-4 py-2">
                 <SeatSortHeader
@@ -474,7 +474,7 @@ export default async function AdminExamPage({
                   buildHref={(s) => `/admin/exams/${exam.id}?sort=${s}`}
                 />
               </th>
-              <th className="px-4 py-2">Comment</th>
+              <th className="px-4 py-2">Comments</th>
               {showFinalColumn && (
                 <th className="px-4 py-2">
                   <SeatSortHeader

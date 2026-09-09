@@ -227,6 +227,10 @@ export function GradeTable({
     : isSecondary
       ? "Your grade"
       : "Grade";
+  // First marker owns "Feedback"; second marker leaves "Comments".
+  // Resolving view is driven by the first marker, so their own current
+  // note is Feedback too.
+  const yourCommentLabel = isSecondary ? "Comments" : "Feedback";
 
   return (
     <section className="rounded-lg border bg-white shadow-sm">
@@ -255,7 +259,7 @@ export function GradeTable({
             {total > 0 && graded === total ? " ✓" : ""}
           </p>
           <p className="mt-1 text-xs text-slate-500">
-            CIDs are hidden from markers. Comments are optional.
+            CIDs are hidden from markers. {yourCommentLabel} are optional.
           </p>
         </div>
       </div>
@@ -290,9 +294,11 @@ export function GradeTable({
                 onClick={() => onSort("primary_grade")}
               />
             )}
-            {isResolving && <th className="px-4 py-2">First comment</th>}
+            {(isResolving || isSecondary) && (
+              <th className="px-4 py-2">Feedback</th>
+            )}
             {showSecondary && <th className="px-4 py-2">Secondary grade</th>}
-            {isResolving && <th className="px-4 py-2">Secondary comment</th>}
+            {isResolving && <th className="px-4 py-2">Comments</th>}
             {mcqAfterPrimary && (
               <SortableTh
                 label="MCQ score"
@@ -307,7 +313,7 @@ export function GradeTable({
               dir={sort.dir}
               onClick={() => onSort("grade")}
             />
-            <th className="px-4 py-2">Comment</th>
+            <th className="px-4 py-2">{yourCommentLabel}</th>
             <SortableTh
               label="Saved"
               active={sort.key === "saved"}
@@ -324,7 +330,8 @@ export function GradeTable({
                   3 +
                   (showPrimary ? 1 : 0) +
                   (showSecondary ? 1 : 0) +
-                  (isResolving ? 2 : 0) +
+                  (isResolving || isSecondary ? 1 : 0) +
+                  (isResolving ? 1 : 0) +
                   (mcqEnabled ? 1 : 0)
                 }
                 className="px-4 py-8 text-center text-slate-500"
@@ -367,7 +374,7 @@ export function GradeTable({
                     {r.primary_grade ?? "—"}
                   </td>
                 )}
-                {isResolving && (
+                {(isResolving || isSecondary) && (
                   <td className="px-4 py-2 text-slate-700">
                     {r.primary_comment ?? "—"}
                   </td>

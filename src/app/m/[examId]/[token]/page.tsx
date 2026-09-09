@@ -131,6 +131,7 @@ export default async function MarkerByTokenPage({
             saved_at: r.secondary_graded_at,
             current_comment: r.secondary_comment,
             primary_grade: r.grade,
+            primary_comment: r.primary_comment,
             absent: r.absent,
             mcq_score: r.mcq_score,
           }
