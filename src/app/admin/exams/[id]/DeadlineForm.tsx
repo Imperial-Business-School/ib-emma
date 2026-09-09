@@ -12,24 +12,37 @@ import { todayUkIsoDate } from "@/lib/datetime";
 // constraint again. Errors from the server surface below the input
 // rather than crashing the page. Pass allowPast to accept dates in
 // the past (used for the exam date, which admins may backfill).
+// minDate / maxDate override the default gates when set — used to
+// tie the marking deadlines to the exam date and vice versa.
 export function DeadlineForm({
   action,
   name,
   defaultValue,
   helper,
   allowPast = false,
+  minDate,
+  maxDate,
 }: {
   action: (prev: SaveState, fd: FormData) => Promise<SaveState>;
   name: string;
   defaultValue: string;
   helper?: string;
   allowPast?: boolean;
+  minDate?: string;
+  maxDate?: string;
 }) {
   const [state, formAction, pending] = useActionState<SaveState, FormData>(
     action,
     SAVE_STATE_INITIAL,
   );
   const today = todayUkIsoDate();
+  const defaultMin = allowPast ? undefined : today;
+  const min =
+    minDate && defaultMin
+      ? minDate > defaultMin
+        ? minDate
+        : defaultMin
+      : (minDate ?? defaultMin);
   return (
     <form action={formAction} className="mt-2">
       <div className="flex flex-wrap items-center gap-2">
@@ -37,7 +50,8 @@ export function DeadlineForm({
           type="date"
           name={name}
           defaultValue={defaultValue}
-          min={allowPast ? undefined : today}
+          min={min}
+          max={maxDate}
           required
           className={`rounded border px-2 py-1 text-sm ${state.error ? "border-red-400" : ""}`}
         />
