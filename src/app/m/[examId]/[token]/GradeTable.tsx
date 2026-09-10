@@ -387,7 +387,8 @@ export function GradeTable({
           {error}
         </div>
       )}
-      <table className="w-full text-sm">
+      <div className="overflow-x-auto">
+      <table className="w-full text-sm [&_td]:px-3 [&_th]:px-3">
         <thead className="border-b bg-slate-50 text-left text-slate-600">
           <tr>
             <SortableTh
@@ -612,6 +613,7 @@ export function GradeTable({
           })}
         </tbody>
       </table>
+      </div>
       {markingOpen && (
         <div className="flex justify-end border-t px-4 py-3">
           <button
