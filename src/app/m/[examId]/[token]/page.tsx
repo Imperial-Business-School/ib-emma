@@ -428,6 +428,24 @@ export default async function MarkerByTokenPage({
               label="Submit marks"
               disabled={!canComplete}
               className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+              confirmationCopy={
+                <>
+                  I am satisfied by the overall standard and consistency of
+                  marking on this exam.
+                  <br />
+                  <span className="text-xs text-slate-500">
+                    (If you have any concerns about marking quality, please
+                    seek advice from the Exams team by emailing{" "}
+                    <a
+                      href="mailto:bs-exams-team@imperial.ac.uk"
+                      className="text-blue-600 hover:underline"
+                    >
+                      bs-exams-team@imperial.ac.uk
+                    </a>
+                    ).
+                  </span>
+                </>
+              }
             >
               {secondaryMismatchesMissingComment > 0 && (
                 <p className="mt-2 text-xs text-red-700">

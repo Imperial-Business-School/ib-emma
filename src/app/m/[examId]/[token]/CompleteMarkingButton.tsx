@@ -23,18 +23,25 @@ export function CompleteMarkingButton({
   disabled,
   className,
   children,
+  confirmationCopy,
 }: {
   action: (prev: SaveState, fd: FormData) => Promise<SaveState>;
   label: string;
   disabled?: boolean;
   className: string;
   children?: ReactNode;
+  // When provided, renders a checkbox above the submit button whose
+  // label is this copy. The button stays disabled until the marker
+  // ticks the box. Used by the second marker's Submit marks button.
+  confirmationCopy?: ReactNode;
 }) {
   const [state, formAction] = useActionState<SaveState, FormData>(
     action,
     SAVE_STATE_INITIAL,
   );
   const [showConfirm, setShowConfirm] = useState(false);
+  const [attested, setAttested] = useState(false);
+  const requiresAttestation = confirmationCopy != null;
   const formRef = useRef<HTMLFormElement>(null);
   const confirmedRef = useRef(false);
 
@@ -57,9 +64,20 @@ export function CompleteMarkingButton({
 
   return (
     <form ref={formRef} action={formAction} onSubmit={handleSubmit}>
+      {requiresAttestation && (
+        <label className="mb-3 flex items-start gap-2 text-sm text-slate-700">
+          <input
+            type="checkbox"
+            checked={attested}
+            onChange={(e) => setAttested(e.target.checked)}
+            className="mt-0.5 h-4 w-4 shrink-0 accent-blue-600"
+          />
+          <span>{confirmationCopy}</span>
+        </label>
+      )}
       <SubmitButton
         label={label}
-        disabled={disabled}
+        disabled={disabled || (requiresAttestation && !attested)}
         scrollToTop
         className={className}
       />
