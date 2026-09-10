@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { notFound } from "next/navigation";
 import { query, queryOne, type Exam } from "@/lib/db";
 import { SEAT_ORDER_ASC } from "@/lib/seatSort";
+import { computeWeightedGrade } from "@/lib/weighted";
 
 export const dynamic = "force-dynamic";
 
@@ -69,6 +70,22 @@ export async function GET(
         ? [{ header: "MCQ score", key: "mcq", ...textCol }]
         : []),
       { header: "First Marker's grade", key: "primary_grade", ...textCol },
+      // Weighted score column is populated for reference only.
+      // The upload parser skips any column matching /(first|primary)/i,
+      // so anything the second marker types here is ignored on upload
+      // -- the web view always recomputes the weighted score from the
+      // saved DB grades. Only included when MCQ is enabled; without
+      // MCQ the weighted score is just the grade, so the column has
+      // no extra information.
+      ...(mcqEnabled
+        ? [
+            {
+              header: "First marker's Weighted Score",
+              key: "primary_weighted",
+              ...textCol,
+            },
+          ]
+        : []),
       {
         header: "First Marker's feedback",
         key: "primary_feedback",
@@ -78,12 +95,21 @@ export async function GET(
       { header: "Comments", key: "comment", width: 40 },
     ];
     for (const s of seats) {
+      const primaryWeighted = mcqEnabled
+        ? (computeWeightedGrade(
+            s.grade,
+            s.mcq_score,
+            exam.mcq_weighting,
+            true,
+          ) ?? "")
+        : "";
       sheet.addRow(
         mcqEnabled
           ? {
               seat: s.seat_number,
               mcq: s.mcq_score ?? "",
               primary_grade: s.grade ?? "",
+              primary_weighted: primaryWeighted,
               primary_feedback: s.primary_comment ?? "",
               grade: "",
               comment: "",
