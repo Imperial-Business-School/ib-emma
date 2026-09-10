@@ -7,6 +7,7 @@ import {
   type Exam,
   type Submission,
 } from "@/lib/db";
+import { SEAT_ORDER_ASC } from "@/lib/seatSort";
 import { computeWeightedGrade } from "@/lib/weighted";
 import { finaliseTemplateSheet } from "@/lib/xlsxTemplate";
 
@@ -44,10 +45,14 @@ export async function GET(
     );
   }
 
+  // Match the default order of the All Seats table on the admin exam
+  // page (natural seat-number ascending), so the admin can do a
+  // straightforward top-to-bottom cross-check between the file they
+  // are about to upload and the page they've been reviewing.
   const submissions = await query<Submission>(
     `SELECT * FROM submissions
      WHERE exam_id = $1 AND absent = false AND final_grade IS NOT NULL
-     ORDER BY cid`,
+     ORDER BY ${SEAT_ORDER_ASC}`,
     [examId],
   );
 
