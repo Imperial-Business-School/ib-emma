@@ -191,6 +191,26 @@ export function GradeTable({
         return;
       }
     }
+    // First marker resolving discrepancies: every row must carry a
+    // comment explaining why the final grade lands where it does.
+    if (isResolving) {
+      const rowById = new Map(rows.map((r) => [r.id, r]));
+      const missing: string[] = [];
+      for (const id of ids) {
+        const r = rowById.get(id);
+        if (!r || r.absent) continue;
+        const v = (values[id] ?? "").trim();
+        const c = (comments[id] ?? "").trim();
+        if (v !== "" && c === "") missing.push(r.seat_number);
+      }
+      if (missing.length > 0) {
+        const plural = missing.length === 1 ? "" : "s";
+        setError(
+          `Add a comment for seat${plural} ${missing.join(", ")} before saving — a comment is required to explain the final grade.`,
+        );
+        return;
+      }
+    }
     setPendingIds((prev) => new Set([...prev, ...ids]));
     const updates = ids.map((id) => ({
       id,
@@ -261,10 +281,13 @@ export function GradeTable({
     : isSecondary
       ? "Your grade"
       : "Grade";
-  // First marker owns "Feedback"; second marker leaves "Comments".
-  // Resolving view is driven by the first marker, so their own current
-  // note is Feedback too.
-  const yourCommentLabel = isSecondary ? "Comments" : "Feedback";
+  // First marker leaves "Feedback" during their normal marking pass;
+  // second marker leaves "Comments" on their sampled seats. In the
+  // resolution view (still the first marker) the note explains why
+  // the final grade lands where it does, so we call it "Comments"
+  // and require one for every row.
+  const yourCommentLabel =
+    isResolving || isSecondary ? "Comments" : "Feedback";
 
   // Running mean / std of this marker's saved grades. Weighted
   // by MCQ when MCQ is enabled on the exam, so the marker sees the
@@ -452,14 +475,17 @@ export function GradeTable({
               comment !== (r.current_comment ?? "");
             const saving = pendingIds.has(r.id);
             // Second marker must comment whenever their grade differs
-            // from the primary's; drives the red outline + placeholder
-            // on the comment input while they're still typing.
+            // from the primary's; primary marker resolving a
+            // discrepancy must comment on every row explaining the
+            // final grade. Drives the red outline + placeholder on
+            // the comment input while they're still typing.
             const commentRequired =
-              isSecondary &&
-              !isResolving &&
-              value.trim() !== "" &&
-              r.primary_grade != null &&
-              value !== r.primary_grade;
+              (isSecondary &&
+                !isResolving &&
+                value.trim() !== "" &&
+                r.primary_grade != null &&
+                value !== r.primary_grade) ||
+              (isResolving && value.trim() !== "");
             const commentMissing = commentRequired && comment.trim() === "";
             return (
               <tr key={r.id} className="border-b last:border-b-0 align-top">
@@ -527,7 +553,9 @@ export function GradeTable({
                       placeholder={commentRequired ? "required" : "optional"}
                       title={
                         commentRequired
-                          ? "Your grade differs from the first marker's — a comment is required."
+                          ? isResolving
+                            ? "A comment is required to explain the final grade."
+                            : "Your grade differs from the first marker's — a comment is required."
                           : undefined
                       }
                       maxLength={250}

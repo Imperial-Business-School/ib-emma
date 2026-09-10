@@ -247,8 +247,10 @@ export default async function MarkerByTokenPage({
         {isResolving ? (
           <p className="mt-2 text-sm text-slate-600">
             <strong>Final marking.</strong> Review each discrepancy below
-            between your grade and the second marker&apos;s, and submit a
-            final grade.
+            between your grade and the second marker&apos;s. Submit your
+            final grade and enter a comment for each row to explain your
+            decision. Click Save for each row, and then click Submit Final
+            Marks, below.
           </p>
         ) : (
           <p className="mt-2 text-sm text-slate-600">

@@ -131,6 +131,20 @@ export async function saveGradesByTokenAction(
         }
       }
     }
+    // Primary marker resolving discrepancies must comment on every
+    // row -- the comment is the auditable rationale for the final
+    // grade. Admin override skips this check.
+    if (inResolutionPhase && !isAdminOverride) {
+      const newGrade = u.grade.trim();
+      if (newGrade !== "") {
+        const c = (u.comment ?? "").trim();
+        if (c === "") {
+          throw new Error(
+            `Seat ${row.id}: a comment is required to explain the final grade before saving.`,
+          );
+        }
+      }
+    }
   }
 
   const results: { id: number; saved_at: string | null }[] = [];
@@ -712,6 +726,24 @@ export async function completeFinalMarkingByTokenAction(
   if ((remaining?.n ?? 0) > 0) {
     throw new Error(
       `${remaining?.n} seat(s) still need a final grade`,
+    );
+  }
+  // Every row that appeared in the resolution view (in-sample rows
+  // where the two markers disagreed) must have a comment recorded
+  // against its final grade -- the comment is the auditable rationale
+  // that gets carried through to the Audit CSV.
+  const missingComment = await queryOne<{ n: number }>(
+    `SELECT COUNT(*)::int AS n FROM submissions
+     WHERE exam_id = $1
+       AND absent = false
+       AND in_sample = true
+       AND grade IS DISTINCT FROM secondary_grade
+       AND (final_comment IS NULL OR btrim(final_comment) = '')`,
+    [examId],
+  );
+  if ((missingComment?.n ?? 0) > 0) {
+    throw new Error(
+      `${missingComment?.n} row(s) still need a comment explaining the final grade`,
     );
   }
   await query("UPDATE exams SET status = 'complete' WHERE id = $1", [examId]);
