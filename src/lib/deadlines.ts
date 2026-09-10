@@ -151,6 +151,7 @@ export function buildMarkerEmail(opts: {
   markerEmail: string;
   examName: string;
   examCode: string | null;
+  moduleName: string | null;
   role: "primary" | "secondary";
   // Deadline is now a bare UK calendar date ('YYYY-MM-DD'). Overdue is
   // any point past midnight UK following that date.
@@ -161,28 +162,38 @@ export function buildMarkerEmail(opts: {
   const examLabel = opts.examCode
     ? `${opts.examCode} — ${opts.examName}`
     : opts.examName;
-  const greeting = opts.markerName ? `Hi ${opts.markerName},` : "Hi,";
+  const greeting = opts.markerName ? `Hi ${opts.markerName}` : "Hi";
+  const greetingLegacy = opts.markerName ? `Hi ${opts.markerName},` : "Hi,";
   const deadlineLine = opts.deadline
     ? `Deadline: 10:00 on ${formatDateOnly(opts.deadline)} (UK time)`
     : "Deadline: not set";
   const roleLabel = opts.role === "primary" ? "first" : "second";
+  const moduleName = opts.moduleName ?? opts.examName;
+  const codeSuffix = opts.examCode ? ` (${opts.examCode})` : "";
 
   if (opts.kind === "commence") {
     return {
       to: opts.markerEmail,
-      subject: `Marking ready: ${examLabel}`,
+      subject: `Exam marking: please begin marking ${opts.examName} for ${moduleName}`,
       kind: `${roleLabel}_commence`,
       examId: opts.examId ?? null,
       body: [
         greeting,
         "",
-        `You have been assigned as the ${roleLabel} marker for ${examLabel}.`,
+        `You have been assigned as the ${roleLabel} marker for ${opts.examName} on ${moduleName}${codeSuffix}.`,
+        "",
         deadlineLine,
         "",
-        `Open the marking screen: ${opts.url}`,
+        `Visit this link to submit marks: ${opts.url}`,
+        "",
+        "The Exams team will provide you with the exam scripts or Wiseflow link separately.",
         "",
         "Thank you,",
-        "Exam administration",
+        "",
+        "Exams team",
+        "Imperial Business School",
+        "",
+        "This is an automated notification sent by EMMA. Do not reply. Contact bs-exams-team@imperial.ac.uk for help.",
       ].join("\n"),
     };
   }
@@ -203,7 +214,7 @@ export function buildMarkerEmail(opts: {
     kind: `${roleLabel}_${opts.kind}`,
     examId: opts.examId ?? null,
     body: [
-      greeting,
+      greetingLegacy,
       "",
       `Your ${roleLabel} marking of ${examLabel} is past the deadline.`,
       deadlineLine,
@@ -363,6 +374,7 @@ async function handlePhase(args: {
         markerEmail: marker.email,
         examName: exam.name,
         examCode: exam.code,
+        moduleName: exam.module_name,
         role: phase,
         deadline: deadlineDate,
         url,
@@ -383,6 +395,7 @@ async function handlePhase(args: {
         markerEmail: marker.email,
         examName: exam.name,
         examCode: exam.code,
+        moduleName: exam.module_name,
         role: phase,
         deadline: deadlineDate,
         url,

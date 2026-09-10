@@ -798,6 +798,7 @@ export async function startPrimaryMarkingAction(examId: number) {
         markerEmail: marker.email,
         examName: exam.name,
         examCode: exam.code,
+        moduleName: exam.module_name,
         role: "primary",
         deadline: exam.primary_deadline_date,
         url: markerUrl(origin, exam.id, exam.primary_access_token),
@@ -893,6 +894,7 @@ export async function startSecondaryMarkingAction(examId: number) {
           markerEmail: marker.email,
           examName: exam.name,
           examCode: exam.code,
+          moduleName: exam.module_name,
           role: "secondary",
           deadline: secondaryDeadline,
           // secondaryDeadline is now a 'YYYY-MM-DD' string
