@@ -102,27 +102,26 @@ export async function notifyAdminsOfExamComplete(
   const link = `${origin}/admin/exams/${exam.id}`;
   const codeSuffix = moduleCode ? ` (${moduleCode})` : "";
   const subject = `Exam marking completed for ${exam.name} on ${moduleName}${codeSuffix}`;
+  const body = [
+    "Hello,",
+    "",
+    "The first and second markers have completed marking for this exam. Please carry out final checks, download the final grades spreadsheet, and upload grades to Canvas.",
+    "",
+    `Link to exam admin page: ${link}`,
+    "",
+    "Thank you,",
+    "Exam administration",
+  ].join("\n");
 
-  for (const admin of admins) {
-    const body = [
-      admin.name ? `Hello ${admin.name},` : "Hello,",
-      "",
-      "The first and second markers have completed marking for this exam. Please carry out final checks, download the final grades spreadsheet, and upload grades to Canvas.",
-      "",
-      `Link to exam admin page: ${link}`,
-      "",
-      "Thank you,",
-      "Exam administration",
-    ].join("\n");
-
-    await recordEmail({
-      to: admin.email,
-      subject,
-      body,
-      examId: exam.id,
-      kind: "exam_complete",
-    });
-  }
+  const [primary, ...rest] = admins;
+  await recordEmail({
+    to: primary.email,
+    cc: rest.length > 0 ? rest.map((a) => a.email).join(", ") : undefined,
+    subject,
+    body,
+    examId: exam.id,
+    kind: "exam_complete",
+  });
 }
 
 export async function notifyAdminsOfCheckRequired({
@@ -144,28 +143,27 @@ export async function notifyAdminsOfCheckRequired({
   const codeSuffix = moduleCode ? ` (${moduleCode})` : "";
   const codeSubject = moduleCode ? `, ${moduleCode}` : "";
   const subject = `Exam marking: grade discrepancies - admin check required (${moduleName}${codeSubject}, ${exam.name})`;
+  const body = [
+    "Hi,",
+    "",
+    `Second marking is complete on ${exam.name} on ${moduleName}${codeSuffix}.`,
+    "",
+    `${differed} of ${total} grades differ between first and second marker. Please review the exam grades and discuss with both markers.`,
+    "",
+    link,
+    "",
+    "Thank you,",
+    "Exam administration",
+  ].join("\n");
 
-  for (const admin of admins) {
-    const body = [
-      admin.name ? `Hi ${admin.name},` : "Hi,",
-      "",
-      `Second marking is complete on ${exam.name} on ${moduleName}${codeSuffix}.`,
-      "",
-      `${differed} of ${total} grades differ between first and second marker. Please review the exam grades and discuss with both markers.`,
-      "",
-      link,
-      "",
-      "Thank you,",
-      "Exam administration",
-    ].join("\n");
-
-    await recordEmail({
-      to: admin.email,
-      subject,
-      body,
-      examId: exam.id,
-      kind: "admin_check_required",
-      urgent: true,
-    });
-  }
+  const [primary, ...rest] = admins;
+  await recordEmail({
+    to: primary.email,
+    cc: rest.length > 0 ? rest.map((a) => a.email).join(", ") : undefined,
+    subject,
+    body,
+    examId: exam.id,
+    kind: "admin_check_required",
+    urgent: true,
+  });
 }
