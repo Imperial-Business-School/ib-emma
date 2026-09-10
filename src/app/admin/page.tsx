@@ -91,6 +91,10 @@ export default async function AdminDashboard() {
                       'second_marking_overdue','second_marking_late')
      GROUP BY status`,
   );
+  const adminCheckRow = await queryOne<{ n: number }>(
+    "SELECT COUNT(*)::int AS n FROM exams WHERE status = 'admin_check_required'",
+  );
+  const adminCheckCount = adminCheckRow?.n ?? 0;
   const countByStatus: Record<string, number> = {};
   for (const row of overdueByStatus) countByStatus[row.status] = row.n;
   const overdueCount =
@@ -211,7 +215,7 @@ export default async function AdminDashboard() {
       </section>
 
       {/* Stats row */}
-      <section className="grid gap-4 md:grid-cols-2">
+      <section className="grid gap-4 md:grid-cols-3">
         <div className="rounded-lg border bg-white p-4 shadow-sm">
           <p className="text-xs font-semibold uppercase text-slate-500">
             Exams created
@@ -222,6 +226,36 @@ export default async function AdminDashboard() {
             className="mt-1 inline-block text-xs text-blue-600 hover:underline"
           >
             View all exams →
+          </Link>
+        </div>
+        <div
+          className={`rounded-lg border p-4 shadow-sm ${
+            adminCheckCount > 0
+              ? "border-rose-300 bg-rose-50"
+              : "border-slate-200 bg-white"
+          }`}
+        >
+          <p
+            className={`text-xs font-semibold uppercase ${
+              adminCheckCount > 0 ? "text-rose-800" : "text-slate-500"
+            }`}
+          >
+            Admin check required
+          </p>
+          <p
+            className={`mt-2 text-3xl font-bold ${
+              adminCheckCount > 0 ? "text-rose-900" : "text-slate-900"
+            }`}
+          >
+            {adminCheckCount}
+          </p>
+          <Link
+            href="/exams?status=admin_check_required"
+            className={`mt-1 inline-block text-xs hover:underline ${
+              adminCheckCount > 0 ? "text-rose-700" : "text-blue-600"
+            }`}
+          >
+            View these exams →
           </Link>
         </div>
         <div className="rounded-lg border bg-white p-4 shadow-sm">

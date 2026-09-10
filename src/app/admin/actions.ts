@@ -5,6 +5,7 @@ import { getRequestOrigin } from "@/lib/origin";
 import { revalidatePath } from "next/cache";
 import { findOrCreateUser } from "@/lib/auth";
 import { query, queryOne, randomToken, type Exam } from "@/lib/db";
+import { notifyFirstMarkerOfDiscrepancies } from "@/lib/discrepancyEmails";
 import { parseTabularFile } from "@/lib/tabular";
 import { parseUkLocalDateTime, todayUkIsoDate } from "@/lib/datetime";
 import {
@@ -366,6 +367,34 @@ export async function adminOverrideGradeAction(
      WHERE id = $3 AND exam_id = $4`,
     [value, note, submissionId, examId],
   );
+
+  // When the admin is entering final grades in admin_check_required
+  // or review, auto-flip the exam to complete as soon as every non-
+  // absent seat has a final_grade set. Mirrors the completion the
+  // first marker triggers from their own final-marking screen, so
+  // the admin doesn't need to click a separate "mark complete" button.
+  if (field === "final_grade") {
+    const currentStatus = await queryOne<{ status: string }>(
+      "SELECT status FROM exams WHERE id = $1",
+      [examId],
+    );
+    if (
+      currentStatus &&
+      (currentStatus.status === "admin_check_required" ||
+        currentStatus.status === "review")
+    ) {
+      const remaining = await queryOne<{ n: number }>(
+        `SELECT COUNT(*)::int AS n FROM submissions
+         WHERE exam_id = $1 AND absent = false AND final_grade IS NULL`,
+        [examId],
+      );
+      if ((remaining?.n ?? 0) === 0) {
+        await query("UPDATE exams SET status = 'complete' WHERE id = $1", [
+          examId,
+        ]);
+      }
+    }
+  }
   revalidatePath(`/admin/exams/${examId}`);
 }
 
@@ -1003,4 +1032,43 @@ export async function createExamActionState(
     if (isNextControlFlow(e)) throw e;
     return toErrorState(e);
   }
+}
+
+// Admin choosing NOT to hand-adjust an admin_check_required exam
+// themselves: hand it back to the first marker for the usual
+// discrepancy-resolution flow, and send the discrepancy email that
+// would ordinarily fire at the review-status transition.
+export async function deferAdminCheckToFirstMarkerAction(examId: number) {
+  await requireAdmin();
+  const exam = await queryOne<Exam>("SELECT * FROM exams WHERE id = $1", [
+    examId,
+  ]);
+  if (!exam) throw new Error("Exam not found");
+  if (exam.status !== "admin_check_required") {
+    throw new Error("Exam is not awaiting admin check");
+  }
+  await query("UPDATE exams SET status = 'review' WHERE id = $1", [examId]);
+
+  // Recompute the counts the same way the second-marker submit did,
+  // so the email carries the right N / M when it lands.
+  const counts = await queryOne<{ total: number; differed: number }>(
+    `SELECT
+       COUNT(*) FILTER (
+         WHERE in_sample = true AND absent = false
+           AND grade IS NOT NULL AND secondary_grade IS NOT NULL
+       )::int AS total,
+       COUNT(*) FILTER (
+         WHERE in_sample = true AND absent = false
+           AND grade IS NOT NULL AND secondary_grade IS NOT NULL
+           AND grade <> secondary_grade
+       )::int AS differed
+     FROM submissions WHERE exam_id = $1`,
+    [examId],
+  );
+  await notifyFirstMarkerOfDiscrepancies({
+    examId,
+    differed: counts?.differed ?? 0,
+    total: counts?.total ?? 0,
+  });
+  revalidatePath(`/admin/exams/${examId}`);
 }

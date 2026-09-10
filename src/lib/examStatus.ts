@@ -10,6 +10,7 @@ export type ExamStatus =
   | "secondary_marking"
   | "second_marking_overdue"
   | "second_marking_late"
+  | "admin_check_required"
   | "review"
   | "complete";
 
@@ -49,7 +50,8 @@ export const EXAM_STATUS_LABEL: Record<ExamStatus, string> = {
   secondary_marking: "Secondary marking in progress",
   second_marking_overdue: "Second marking overdue",
   second_marking_late: "Second marking late",
-  review: "Requires Review",
+  admin_check_required: "Admin check required",
+  review: "First marker final review",
   complete: "Ready for Canvas upload",
 };
 
@@ -78,6 +80,7 @@ export const STATUS_BADGE_CLASS: Record<ExamStatus, string> = {
   secondary_marking: "bg-indigo-100 text-indigo-800",
   second_marking_overdue: "bg-amber-200 text-amber-900",
   second_marking_late: "bg-red-200 text-red-900",
+  admin_check_required: "bg-rose-200 text-rose-900",
   review: "bg-amber-100 text-amber-800",
   complete: "bg-green-100 text-green-800",
 };

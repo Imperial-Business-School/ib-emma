@@ -8,6 +8,10 @@ import {
 } from "@/lib/examStatus";
 import { computeFinalGrade } from "@/lib/finalGrade";
 import { computeSampleIdsForMode } from "@/lib/sampling";
+import {
+  notifyAdminsOfCheckRequired,
+  notifyFirstMarkerOfDiscrepancies,
+} from "@/lib/discrepancyEmails";
 import { parseTabularFile } from "@/lib/tabular";
 import { type SaveState, toErrorState } from "@/lib/actionState";
 
@@ -627,6 +631,11 @@ export async function completeSecondaryMarkingByTokenAction(
     [examId],
   );
   let unresolved = 0;
+  // Denominator for the admin-check threshold: sampled non-absent
+  // seats where BOTH markers gave a grade. Numerator: of those, the
+  // ones where the two grades differ.
+  let sampleWithBoth = 0;
+  let sampleDiffered = 0;
   for (const s of subs) {
     if (s.absent) {
       // Absent students get no final grade -- Canvas import will leave
@@ -637,6 +646,10 @@ export async function completeSecondaryMarkingByTokenAction(
       );
       continue;
     }
+    if (s.in_sample && s.grade != null && s.secondary_grade != null) {
+      sampleWithBoth++;
+      if (s.grade !== s.secondary_grade) sampleDiffered++;
+    }
     const { value } = computeFinalGrade(s.grade, s.secondary_grade, s.in_sample);
     if (value === null) unresolved++;
     await query("UPDATE submissions SET final_grade = $1 WHERE id = $2", [
@@ -645,12 +658,37 @@ export async function completeSecondaryMarkingByTokenAction(
     ]);
   }
 
+  // Route to admin_check_required when >= 33.33% of sampled grades
+  // differ; otherwise the existing review / complete branches.
+  const requiresAdminCheck =
+    sampleWithBoth > 0 && sampleDiffered * 3 >= sampleWithBoth;
+  const nextStatus = requiresAdminCheck
+    ? "admin_check_required"
+    : unresolved > 0
+      ? "review"
+      : "complete";
+
   await query(
     `UPDATE exams
      SET status = $1, secondary_completed_at = now()
      WHERE id = $2`,
-    [unresolved > 0 ? "review" : "complete", examId],
+    [nextStatus, examId],
   );
+
+  // Notify the right audience about the transition.
+  if (nextStatus === "admin_check_required") {
+    await notifyAdminsOfCheckRequired({
+      examId,
+      differed: sampleDiffered,
+      total: sampleWithBoth,
+    });
+  } else if (nextStatus === "review") {
+    await notifyFirstMarkerOfDiscrepancies({
+      examId,
+      differed: sampleDiffered,
+      total: sampleWithBoth,
+    });
+  }
 
   revalidatePath(`/m/${examId}/${token}`);
   revalidatePath(`/admin/exams/${examId}`);

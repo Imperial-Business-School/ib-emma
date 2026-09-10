@@ -13,6 +13,7 @@ import { STATUS_BADGE_CLASS } from "@/lib/examStatus";
 import { sweepDeadlineStatuses } from "@/lib/deadlines";
 import {
   adminOverrideGradeActionState,
+  deferAdminCheckToFirstMarkerAction,
   deleteSeatAction,
   reassignMarkerAction,
   regenerateMarkerTokenAction,
@@ -141,7 +142,29 @@ export default async function AdminExamPage({
     (s) => s.in_sample && s.secondary_grade !== null,
   ).length;
   const showFinalColumn =
-    exam.status === "review" || exam.status === "complete";
+    exam.status === "review" ||
+    exam.status === "complete" ||
+    exam.status === "admin_check_required";
+  const isAdminCheckRequired = exam.status === "admin_check_required";
+  // Same denominator/numerator the second-marker submit uses to
+  // decide the routing -- N of M sampled non-absent seats where both
+  // markers gave a grade and the grades differ.
+  const adminCheckDenominator = submissions.filter(
+    (s) =>
+      s.in_sample && !s.absent && s.grade != null && s.secondary_grade != null,
+  ).length;
+  const adminCheckNumerator = submissions.filter(
+    (s) =>
+      s.in_sample &&
+      !s.absent &&
+      s.grade != null &&
+      s.secondary_grade != null &&
+      s.grade !== s.secondary_grade,
+  ).length;
+  const adminCheckPercent =
+    adminCheckDenominator > 0
+      ? Math.round((adminCheckNumerator / adminCheckDenominator) * 100)
+      : 0;
   const canStartMarking =
     exam.status === "setup" && totalSeats > 0 && exam.primary_marker_id;
   const isFirstMarkingReview = exam.status === "first_marking_review";
@@ -268,6 +291,35 @@ export default async function AdminExamPage({
           </a>
         </div>
       </div>
+
+      {isAdminCheckRequired && (
+        <div className="rounded-lg border border-rose-300 bg-rose-50 p-5 shadow-sm">
+          <h3 className="text-lg font-semibold text-rose-900">
+            Admin check required
+          </h3>
+          <p className="mt-2 text-sm text-rose-900">
+            After second marking, {adminCheckNumerator} of{" "}
+            {adminCheckDenominator} exams ({adminCheckPercent}%) have been
+            given a different grade to the first marker. Please discuss this
+            with both markers, then adjust the grades in the table below
+            accordingly. Alternatively, you may click the &apos;Defer to First
+            Marker&apos; button if you are happy for them to resolve these
+            grade discrepancies.
+          </p>
+          <form
+            action={async () => {
+              "use server";
+              await deferAdminCheckToFirstMarkerAction(exam.id);
+            }}
+            className="mt-4"
+          >
+            <SubmitButton
+              label="Defer to First Marker"
+              className="rounded bg-rose-700 px-4 py-2 text-sm font-medium text-white hover:bg-rose-800"
+            />
+          </form>
+        </div>
+      )}
 
       {isFirstMarkingReview && (
         <div className="rounded-lg border border-purple-300 bg-purple-50 p-4">
