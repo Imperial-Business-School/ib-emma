@@ -47,7 +47,7 @@ export const EXAM_STATUS_LABEL: Record<ExamStatus, string> = {
   first_marking_overdue: "First marking overdue",
   first_marking_late: "First marking late",
   first_marking_review: "First marking complete — ready for admin review",
-  secondary_marking: "Secondary marking in progress",
+  secondary_marking: "Second marking in progress",
   second_marking_overdue: "Second marking overdue",
   second_marking_late: "Second marking late",
   admin_check_required: "Admin check required",
