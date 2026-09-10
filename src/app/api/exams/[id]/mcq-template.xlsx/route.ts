@@ -2,6 +2,7 @@ import ExcelJS from "exceljs";
 import { NextResponse } from "next/server";
 import { query, queryOne, type Exam } from "@/lib/db";
 import { SEAT_ORDER_ASC } from "@/lib/seatSort";
+import { finaliseTemplateSheet } from "@/lib/xlsxTemplate";
 
 export const dynamic = "force-dynamic";
 
@@ -39,10 +40,10 @@ export async function GET(
     { header: "CID", key: "cid", width: 15, style: { numFmt: "@" } },
     { header: "MCQ score", key: "mcq", width: 15, style: { numFmt: "@" } },
   ];
-  sheet.getRow(1).font = { bold: true };
   for (const s of seats) {
     sheet.addRow({ seat: s.seat_number, cid: s.cid, mcq: "" });
   }
+  finaliseTemplateSheet(sheet);
 
   const buffer = await workbook.xlsx.writeBuffer();
   const safe = (exam?.code || exam?.name || "mcq")

@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { query, queryOne, type Exam } from "@/lib/db";
 import { SEAT_ORDER_ASC } from "@/lib/seatSort";
 import { computeWeightedGrade } from "@/lib/weighted";
+import { finaliseTemplateSheet } from "@/lib/xlsxTemplate";
 
 export const dynamic = "force-dynamic";
 
@@ -154,7 +155,7 @@ export async function GET(
       );
     }
   }
-  sheet.getRow(1).font = { bold: true };
+  finaliseTemplateSheet(sheet);
 
   const buffer = await workbook.xlsx.writeBuffer();
   return new NextResponse(buffer, {

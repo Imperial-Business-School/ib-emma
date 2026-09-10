@@ -2,6 +2,7 @@ import ExcelJS from "exceljs";
 import { NextResponse } from "next/server";
 import { adminAllowed } from "@/lib/actor";
 import { queryOne, type Exam } from "@/lib/db";
+import { finaliseTemplateSheet } from "@/lib/xlsxTemplate";
 
 export const dynamic = "force-dynamic";
 
@@ -35,8 +36,7 @@ export async function GET(
     { header: "Seat number", key: "seat", width: 15, style: { numFmt: "@" } },
     { header: "CID", key: "cid", width: 15, style: { numFmt: "@" } },
   ];
-  // Style the header row for visibility.
-  sheet.getRow(1).font = { bold: true };
+  finaliseTemplateSheet(sheet);
 
   const buffer = await workbook.xlsx.writeBuffer();
   const safe = (exam?.code || exam?.name || "seats")
