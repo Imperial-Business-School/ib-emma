@@ -270,17 +270,17 @@ export default async function AdminExamPage({
         <div className="flex flex-col items-end gap-2">
           {canDownloadCsv ? (
             <a
-              href={`/api/exams/${exam.id}/canvas.csv`}
+              href={`/api/exams/${exam.id}/canvas.xlsx`}
               className="rounded border bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50"
             >
-              Download Canvas CSV
+              Download Canvas gradebook
             </a>
           ) : (
             <span
               className="rounded border bg-slate-50 px-3 py-2 text-sm text-slate-400"
               title="Available once every seat has a final grade"
             >
-              Download Canvas CSV
+              Download Canvas gradebook
             </span>
           )}
           <a

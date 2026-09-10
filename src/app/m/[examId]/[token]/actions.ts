@@ -712,7 +712,7 @@ export async function completeSecondaryMarkingByTokenAction(
 }
 
 // Primary marker confirms they've resolved all discrepancies. Flips status
-// back to 'complete' so the Canvas CSV can be downloaded.
+// back to 'complete' so the Canvas gradebook can be downloaded.
 export async function completeFinalMarkingByTokenAction(
   examId: number,
   token: string,

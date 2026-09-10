@@ -25,7 +25,7 @@ when entering grades.
    non-numeric) is flagged for admin resolution.
 6. The admin sets final grades for any flagged rows. The status auto-flips
    to **Ready for Canvas upload** once every row has a final grade.
-7. The admin downloads a Canvas Gradebook CSV with each student's CID and
+7. The admin downloads a Canvas gradebook XLSX with each student's CID and
    their final grade, ready to import into Canvas.
 
 ## Auth
@@ -78,13 +78,17 @@ npm run dev
 
 Open <http://localhost:3000>.
 
-## Canvas Gradebook CSV
+## Canvas gradebook
 
-The exported file uses Canvas's standard import headers:
+The exported file is an `.xlsx` (Canvas Gradebook Import accepts both
+`.csv` and `.xlsx`). Canvas's standard import headers are used:
 
 ```
 Student, ID, SIS User ID, SIS Login ID, Section, <Assignment column>
 ```
 
 Only `SIS User ID` (the CID) and the assignment column are populated; Canvas
-matches students by SIS User ID.
+matches students by SIS User ID. The `SIS User ID` column is Text-formatted
+(`@`) so Excel does not strip the leading zero from CIDs like `0123456`
+when the admin opens the file to review before uploading — the Canvas
+matcher requires the exact CID.
