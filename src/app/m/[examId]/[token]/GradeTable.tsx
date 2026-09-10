@@ -235,13 +235,15 @@ export function GradeTable({
   // note is Feedback too.
   const yourCommentLabel = isSecondary ? "Comments" : "Feedback";
 
-  // Running mean / std of the primary marker's saved grades. Weighted
-  // by MCQ when MCQ is enabled on the exam, so the primary sees the
+  // Running mean / std of this marker's saved grades. Weighted
+  // by MCQ when MCQ is enabled on the exam, so the marker sees the
   // grade that would actually be recorded, not their raw script grade.
-  // Only shown on the first marker's normal marking view (not in the
-  // resolution phase, and never on the second marker's view).
-  const showPrimaryStats = !isSecondary && !isResolving;
-  const savedWeighted = showPrimaryStats
+  // Shown on both the first- and second-marker marking views; hidden
+  // during the resolution phase where "the marker's grade" is the
+  // final grade being resolved and stats over a discrepancy-only view
+  // would be misleading.
+  const showMarkerStats = !isResolving;
+  const savedWeighted = showMarkerStats
     ? rows
         .filter((r) => !r.absent && r.current_grade != null)
         .map((r) =>
@@ -361,7 +363,7 @@ export function GradeTable({
               onClick={() => onSort("grade")}
             />
             <th className="px-4 py-2">{yourCommentLabel}</th>
-            {showPrimaryStats && mcqEnabled && (
+            {showMarkerStats && mcqEnabled && (
               <th className="px-4 py-2">Weighted grade</th>
             )}
             <SortableTh
@@ -383,7 +385,7 @@ export function GradeTable({
                   (isResolving || isSecondary ? 1 : 0) +
                   (isResolving ? 1 : 0) +
                   (mcqEnabled ? 1 : 0) +
-                  (showPrimaryStats && mcqEnabled ? 1 : 0)
+                  (showMarkerStats && mcqEnabled ? 1 : 0)
                 }
                 className="px-4 py-8 text-center text-slate-500"
               >
@@ -497,7 +499,7 @@ export function GradeTable({
                     </span>
                   )}
                 </td>
-                {showPrimaryStats && mcqEnabled && (
+                {showMarkerStats && mcqEnabled && (
                   <td className="px-4 py-2 font-mono text-slate-700">
                     {r.absent
                       ? "—"
@@ -551,7 +553,7 @@ export function GradeTable({
           </button>
         </div>
       )}
-      {showPrimaryStats && (
+      {showMarkerStats && (
         <div className="flex flex-wrap gap-x-6 gap-y-1 border-t bg-slate-50 px-4 py-3 text-sm text-slate-700">
           <span>
             <span className="text-slate-500">Mean</span>
