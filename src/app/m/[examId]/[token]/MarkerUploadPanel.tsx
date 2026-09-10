@@ -9,9 +9,11 @@ import {
 export function MarkerUploadPanel({
   examId,
   token,
+  isSecondary = false,
 }: {
   examId: number;
   token: string;
+  isSecondary?: boolean;
 }) {
   const [pending, startTransition] = useTransition();
   const [summary, setSummary] = useState<string | null>(null);
@@ -70,16 +72,27 @@ export function MarkerUploadPanel({
   return (
     <section className="rounded-lg border bg-white p-6 shadow-sm">
       <h2 className="text-lg font-semibold">Bulk actions</h2>
-      <p className="mt-1 text-sm text-slate-600">
-        Upload grades using the template Excel sheet below, or add rows
-        individually.
-      </p>
+      {isSecondary ? (
+        <p className="mt-1 text-sm text-slate-600">
+          Download the template below, which contains the first marker&apos;s
+          grades and feedback. Add your own grades and comments, then save
+          and re-upload the sheet. Alternatively, add your grades and
+          comments individually in the table below.
+        </p>
+      ) : (
+        <p className="mt-1 text-sm text-slate-600">
+          Upload grades using the template Excel sheet below, or add rows
+          individually.
+        </p>
+      )}
       <div className="mt-3">
         <a
           href={`/api/m/${examId}/${token}/grades-template.xlsx`}
           className="text-xs text-blue-600 hover:underline"
         >
-          Download blank template (Excel)
+          {isSecondary
+            ? "Download marking sheet (Excel)"
+            : "Download blank template (Excel)"}
         </a>
       </div>
       <form

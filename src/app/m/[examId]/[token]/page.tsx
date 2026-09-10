@@ -344,7 +344,11 @@ export default async function MarkerByTokenPage({
       )}
 
       {markingOpen && !isResolving && (
-        <MarkerUploadPanel examId={examId} token={token} />
+        <MarkerUploadPanel
+          examId={examId}
+          token={token}
+          isSecondary={isSecondary}
+        />
       )}
 
       <GradeTable
