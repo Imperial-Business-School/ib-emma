@@ -246,7 +246,8 @@ export default async function AdminExamPage({
             second marking. Tick or untick the checkbox on any row below to
             add or remove a seat. Check the second marker deadline and click{" "}
             <em>Update</em> if you need to change it. When you&apos;re happy,
-            click <em>Start second marking</em>.
+            click <em>Start second marking</em>. The Second Marker will be
+            sent a notification by email.
           </p>
           <div className="mt-3">
             <span className="block text-xs font-medium text-purple-900">
@@ -275,7 +276,7 @@ export default async function AdminExamPage({
             className="mt-4"
           >
             <SubmitButton
-              label="Start second marking → notify second marker"
+              label="Start Second Marking"
               disabled={sampleCount === 0}
               className="rounded bg-purple-700 px-3 py-2 text-sm font-medium text-white hover:bg-purple-800 disabled:cursor-not-allowed disabled:bg-slate-300"
             />
