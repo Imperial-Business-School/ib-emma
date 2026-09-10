@@ -239,15 +239,15 @@ export default async function AdminExamPage({
       {isFirstMarkingReview && (
         <div className="rounded-lg border border-purple-300 bg-purple-50 p-4">
           <h3 className="font-semibold text-purple-900">
-            Review the second-marking sample
+            Review the second marking sample
           </h3>
           <p className="mt-1 text-sm text-purple-800">
             {sampleCount} of {totalSeats} seats are currently selected for
             second marking. Tick or untick the checkbox on any row below to
-            add or remove a seat. Check the second marker deadline and click{" "}
-            <em>Update</em> if you need to change it. When you&apos;re happy,
-            click <em>Start second marking</em>. The Second Marker will be
-            sent a notification by email.
+            add or remove a seat. Check the deadline and click{" "}
+            <em>Save</em> if you need to change it. When you&apos;re happy,
+            click &lsquo;Start Second Marking&rsquo;. The second marker will
+            be sent a notification email.
           </p>
           <div className="mt-3">
             <span className="block text-xs font-medium text-purple-900">
