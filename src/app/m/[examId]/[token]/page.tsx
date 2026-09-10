@@ -405,6 +405,11 @@ export default async function MarkerByTokenPage({
                 that marking is complete and will be asked to upload grades
                 into Canvas.
               </p>
+              <p className="mt-2 text-xs text-slate-500">
+                Provisional marks will be released to students once the
+                exams team have done final checks. The marking will be
+                reviewed by the external examiner for the Exam Board.
+              </p>
             </CompleteMarkingButton>
           ) : isPrimary ? (
             <CompleteMarkingButton
