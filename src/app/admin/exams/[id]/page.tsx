@@ -44,7 +44,7 @@ import {
 } from "@/lib/seatSort";
 import { McqUploadPanel } from "./McqUploadPanel";
 import { DeleteExamForm } from "./DeleteExamForm";
-import { formatDateOnly, formatDateTime, todayUkIsoDate } from "@/lib/datetime";
+import { formatDateOnly, formatDateTime } from "@/lib/datetime";
 
 export const dynamic = "force-dynamic";
 
@@ -244,30 +244,36 @@ export default async function AdminExamPage({
           <p className="mt-1 text-sm text-purple-800">
             {sampleCount} of {totalSeats} seats are currently selected for
             second marking. Tick or untick the checkbox on any row below to
-            add or remove a seat. Check the second marker deadline and update
-            if required. When you&apos;re happy, click{" "}
-            <em>Start second marking</em>.
+            add or remove a seat. Check the second marker deadline and click{" "}
+            <em>Update</em> if you need to change it. When you&apos;re happy,
+            click <em>Start second marking</em>.
           </p>
+          <div className="mt-3">
+            <span className="block text-xs font-medium text-purple-900">
+              Second marker deadline
+            </span>
+            <DeadlineForm
+              action={updateSecondaryDeadlineActionState.bind(null, exam.id)}
+              name="secondary_deadline"
+              defaultValue={exam.secondary_deadline_date ?? ""}
+              minDate={
+                exam.primary_deadline_date && exam.exam_date
+                  ? exam.primary_deadline_date > exam.exam_date
+                    ? exam.primary_deadline_date
+                    : exam.exam_date
+                  : (exam.primary_deadline_date ??
+                    exam.exam_date ??
+                    undefined)
+              }
+            />
+          </div>
           <form
-            action={async (fd) => {
+            action={async () => {
               "use server";
-              await startSecondaryMarkingAction(exam.id, fd);
+              await startSecondaryMarkingAction(exam.id);
             }}
-            className="mt-3 flex flex-wrap items-end gap-3"
+            className="mt-4"
           >
-            <label className="text-sm">
-              <span className="block text-xs font-medium text-purple-900">
-                Second marker deadline
-              </span>
-              <input
-                type="date"
-                name="secondary_deadline"
-                defaultValue={exam.secondary_deadline_date ?? ""}
-                min={todayUkIsoDate()}
-                required
-                className="mt-1 rounded border px-2 py-1 text-sm"
-              />
-            </label>
             <SubmitButton
               label="Start second marking → notify second marker"
               disabled={sampleCount === 0}

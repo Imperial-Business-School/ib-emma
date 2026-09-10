@@ -800,10 +800,7 @@ export async function toggleInSampleAction(
   revalidatePath(`/admin/exams/${examId}`);
 }
 
-export async function startSecondaryMarkingAction(
-  examId: number,
-  formData: FormData,
-) {
+export async function startSecondaryMarkingAction(examId: number) {
   await requireAdmin();
   const exam = await queryOne<Exam>("SELECT * FROM exams WHERE id = $1", [
     examId,
@@ -812,10 +809,7 @@ export async function startSecondaryMarkingAction(
   if (exam.status !== "first_marking_review") {
     throw new Error("Exam is not awaiting admin review");
   }
-  const secondaryDeadline = parseFutureDeadline(
-    formData.get("secondary_deadline"),
-    "Second marker deadline",
-  );
+  const secondaryDeadline = exam.secondary_deadline_date;
   if (!secondaryDeadline) {
     throw new Error(
       "Set a deadline for the second marker before starting second marking",
