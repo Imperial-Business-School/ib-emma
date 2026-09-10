@@ -5,7 +5,10 @@ import { getRequestOrigin } from "@/lib/origin";
 import { revalidatePath } from "next/cache";
 import { findOrCreateUser } from "@/lib/auth";
 import { query, queryOne, randomToken, type Exam } from "@/lib/db";
-import { notifyFirstMarkerOfDiscrepancies } from "@/lib/discrepancyEmails";
+import {
+  notifyAdminsOfExamComplete,
+  notifyFirstMarkerOfDiscrepancies,
+} from "@/lib/discrepancyEmails";
 import { parseTabularFile } from "@/lib/tabular";
 import { parseUkLocalDateTime, todayUkIsoDate } from "@/lib/datetime";
 import {
@@ -392,6 +395,7 @@ export async function adminOverrideGradeAction(
         await query("UPDATE exams SET status = 'complete' WHERE id = $1", [
           examId,
         ]);
+        await notifyAdminsOfExamComplete(examId);
       }
     }
   }

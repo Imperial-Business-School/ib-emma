@@ -10,6 +10,7 @@ import { computeFinalGrade } from "@/lib/finalGrade";
 import { computeSampleIdsForMode } from "@/lib/sampling";
 import {
   notifyAdminsOfCheckRequired,
+  notifyAdminsOfExamComplete,
   notifyFirstMarkerOfDiscrepancies,
 } from "@/lib/discrepancyEmails";
 import { parseTabularFile } from "@/lib/tabular";
@@ -702,6 +703,8 @@ export async function completeSecondaryMarkingByTokenAction(
       differed: sampleDiffered,
       total: sampleWithBoth,
     });
+  } else if (nextStatus === "complete") {
+    await notifyAdminsOfExamComplete(examId);
   }
 
   revalidatePath(`/m/${examId}/${token}`);
@@ -747,6 +750,7 @@ export async function completeFinalMarkingByTokenAction(
     );
   }
   await query("UPDATE exams SET status = 'complete' WHERE id = $1", [examId]);
+  await notifyAdminsOfExamComplete(examId);
   revalidatePath(`/m/${examId}/${token}`);
   revalidatePath(`/admin/exams/${examId}`);
 }

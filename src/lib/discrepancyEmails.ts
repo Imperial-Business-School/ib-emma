@@ -81,6 +81,50 @@ export async function notifyFirstMarkerOfDiscrepancies({
   });
 }
 
+// Fired whenever an exam transitions into 'complete': either the
+// first marker submits Final Marks, the second marker submits with
+// no discrepancies, or an admin fills in the last final grade on an
+// admin_check_required / review exam. One email per admin, so the
+// Exams team knows the grades are ready to upload to Canvas.
+export async function notifyAdminsOfExamComplete(
+  examId: number,
+): Promise<void> {
+  const ctx = await loadExamContext(examId);
+  if (!ctx) return;
+  const { exam, moduleName, moduleCode } = ctx;
+
+  const admins = await query<{ email: string; name: string }>(
+    "SELECT email, name FROM admins ORDER BY lower(name)",
+  );
+  if (admins.length === 0) return;
+
+  const origin = await getRequestOrigin();
+  const link = `${origin}/admin/exams/${exam.id}`;
+  const codeSuffix = moduleCode ? ` (${moduleCode})` : "";
+  const subject = `Exam marking completed for ${exam.name} on ${moduleName}${codeSuffix}`;
+
+  for (const admin of admins) {
+    const body = [
+      admin.name ? `Hello ${admin.name},` : "Hello,",
+      "",
+      "The first and second markers have completed marking for this exam. Please carry out final checks, download the final grades spreadsheet, and upload grades to Canvas.",
+      "",
+      `Link to exam admin page: ${link}`,
+      "",
+      "Thank you,",
+      "Exam administration",
+    ].join("\n");
+
+    await recordEmail({
+      to: admin.email,
+      subject,
+      body,
+      examId: exam.id,
+      kind: "exam_complete",
+    });
+  }
+}
+
 export async function notifyAdminsOfCheckRequired({
   examId,
   differed,
