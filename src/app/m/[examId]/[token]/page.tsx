@@ -400,8 +400,10 @@ export default async function MarkerByTokenPage({
               className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
             >
               <p className="mt-2 text-xs text-slate-500">
-                Marks all discrepancies as resolved and returns the exam to
-                Ready for Canvas upload.
+                Clicking this button marks all discrepancies as resolved and
+                finalises student grades. The Exams team will be notified
+                that marking is complete and will be asked to upload grades
+                into Canvas.
               </p>
             </CompleteMarkingButton>
           ) : isPrimary ? (
