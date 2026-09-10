@@ -361,6 +361,9 @@ export function GradeTable({
               onClick={() => onSort("grade")}
             />
             <th className="px-4 py-2">{yourCommentLabel}</th>
+            {showPrimaryStats && mcqEnabled && (
+              <th className="px-4 py-2">Weighted grade</th>
+            )}
             <SortableTh
               label="Saved"
               active={sort.key === "saved"}
@@ -379,7 +382,8 @@ export function GradeTable({
                   (showSecondary ? 1 : 0) +
                   (isResolving || isSecondary ? 1 : 0) +
                   (isResolving ? 1 : 0) +
-                  (mcqEnabled ? 1 : 0)
+                  (mcqEnabled ? 1 : 0) +
+                  (showPrimaryStats && mcqEnabled ? 1 : 0)
                 }
                 className="px-4 py-8 text-center text-slate-500"
               >
@@ -493,6 +497,20 @@ export function GradeTable({
                     </span>
                   )}
                 </td>
+                {showPrimaryStats && mcqEnabled && (
+                  <td className="px-4 py-2 font-mono text-slate-700">
+                    {r.absent
+                      ? "—"
+                      : (computeWeightedGrade(
+                          r.current_grade,
+                          r.mcq_score ?? null,
+                          mcqWeighting,
+                          mcqEnabled,
+                        ) ?? (
+                          <span className="text-slate-400">—</span>
+                        ))}
+                  </td>
+                )}
                 <td className="px-4 py-2 text-xs text-slate-600">
                   {r.absent
                     ? ""

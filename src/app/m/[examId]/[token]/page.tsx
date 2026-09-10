@@ -239,6 +239,11 @@ export default async function MarkerByTokenPage({
             )}
           </p>
         )}
+        {exam.mcq_enabled && exam.mcq_weighting != null && (
+          <p className="text-sm text-slate-600">
+            MCQ weighting: {exam.mcq_weighting}%
+          </p>
+        )}
         {isResolving ? (
           <p className="mt-2 text-sm text-slate-600">
             <strong>Final marking.</strong> Review each discrepancy below
