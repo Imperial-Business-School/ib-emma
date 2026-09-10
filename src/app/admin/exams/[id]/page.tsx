@@ -149,6 +149,39 @@ export default async function AdminExamPage({
   const justStarted =
     sp.started === "1" && exam.status === "primary_marking";
 
+  // Running mean / population std dev of the first marker's saved
+  // grades, weighted by MCQ when MCQ is enabled -- matches what the
+  // first marker sees in the footer of their own seats table, so the
+  // admin can sanity-check the distribution alongside the marker.
+  const gradedForStats = submissions
+    .filter((s) => !s.absent && s.grade != null)
+    .map((s) => {
+      const weighted = computeWeightedGrade(
+        s.final_grade ?? s.grade,
+        s.mcq_score,
+        exam.mcq_weighting,
+        exam.mcq_enabled,
+      );
+      return weighted == null ? NaN : Number(weighted);
+    })
+    .filter((n) => Number.isFinite(n));
+  const statsN = gradedForStats.length;
+  const statsMean =
+    statsN > 0
+      ? gradedForStats.reduce((a, b) => a + b, 0) / statsN
+      : null;
+  const statsStd =
+    statsN >= 2 && statsMean != null
+      ? Math.sqrt(
+          gradedForStats.reduce(
+            (a, b) => a + (b - statsMean) * (b - statsMean),
+            0,
+          ) / statsN,
+        )
+      : null;
+  const fmtStat = (n: number | null) =>
+    n == null ? "N/A" : n.toFixed(2);
+
   return (
     <div className="space-y-8">
       {justStarted && (
@@ -495,7 +528,7 @@ export default async function AdminExamPage({
                   />
                 </th>
               )}
-              {showFinalColumn && exam.mcq_enabled && (
+              {exam.mcq_enabled && (
                 <th className="px-4 py-2">Weighted grade</th>
               )}
               <th className="px-4 py-2" />
@@ -670,13 +703,13 @@ export default async function AdminExamPage({
                       )}
                     </td>
                   )}
-                  {showFinalColumn && exam.mcq_enabled && (
+                  {exam.mcq_enabled && (
                     <td className="px-4 py-2 font-medium">
                       {s.absent ? (
                         <span className="text-slate-400">—</span>
                       ) : (
                         (computeWeightedGrade(
-                          s.final_grade,
+                          s.final_grade ?? s.grade,
                           s.mcq_score,
                           exam.mcq_weighting,
                           exam.mcq_enabled,
@@ -710,6 +743,31 @@ export default async function AdminExamPage({
             <AddSeatForm examId={exam.id} />
           </div>
         )}
+        <div className="flex flex-wrap gap-x-6 gap-y-1 border-t bg-slate-50 px-4 py-3 text-sm text-slate-700">
+          <span>
+            <span className="text-slate-500">Mean</span>
+            {exam.mcq_enabled ? (
+              <span className="text-slate-500"> (weighted)</span>
+            ) : null}
+            :{" "}
+            <span className="font-semibold text-slate-900">
+              {fmtStat(statsMean)}
+            </span>
+          </span>
+          <span>
+            <span className="text-slate-500">Std dev</span>
+            {exam.mcq_enabled ? (
+              <span className="text-slate-500"> (weighted)</span>
+            ) : null}
+            :{" "}
+            <span className="font-semibold text-slate-900">
+              {fmtStat(statsStd)}
+            </span>
+          </span>
+          <span className="text-slate-500">
+            over {statsN} saved grade{statsN === 1 ? "" : "s"}
+          </span>
+        </div>
       </section>
 
       {exam.mcq_enabled && (
