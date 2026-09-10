@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
 //
 // Second marker: only the seats in their assigned sample, columns
 // Seat number / First Marker's grade / First Marker's feedback /
-// Secondary Marker grade / Comments (with an MCQ score reference
+// Second Marker grade / Comments (with an MCQ score reference
 // column inserted when the exam has MCQ enabled). The first marker's
 // grade and feedback columns are populated for reference so the second
 // marker can weigh both while filling in their own grade.
@@ -74,7 +74,7 @@ export async function GET(
         key: "primary_feedback",
         width: 40,
       },
-      { header: "Secondary Marker grade", key: "grade", ...textCol },
+      { header: "Second Marker grade", key: "grade", ...textCol },
       { header: "Comments", key: "comment", width: 40 },
     ];
     for (const s of seats) {
