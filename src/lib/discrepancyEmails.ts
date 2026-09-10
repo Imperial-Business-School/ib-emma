@@ -48,6 +48,16 @@ export async function notifyFirstMarkerOfDiscrepancies({
   );
   if (!marker) return;
 
+  // CC the second marker so they can see the resolution being kicked
+  // off. May be missing if the exam was created without a second
+  // marker on file, in which case we just omit the cc.
+  const secondMarker = exam.secondary_marker_id
+    ? await queryOne<{ email: string }>(
+        "SELECT email FROM users WHERE id = $1",
+        [exam.secondary_marker_id],
+      )
+    : null;
+
   const origin = await getRequestOrigin();
   const link = markerUrl(origin, exam.id, exam.primary_access_token);
   const codeSuffix = moduleCode ? ` (${moduleCode})` : "";
@@ -63,6 +73,7 @@ export async function notifyFirstMarkerOfDiscrepancies({
 
   await recordEmail({
     to: marker.email,
+    cc: secondMarker?.email,
     subject,
     body,
     examId: exam.id,
