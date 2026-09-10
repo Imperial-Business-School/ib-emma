@@ -243,12 +243,20 @@ export function GradeTable({
   // final grade being resolved and stats over a discrepancy-only view
   // would be misleading.
   const showMarkerStats = !isResolving;
+  // For the second marker, each row already has the first marker's
+  // grade set. Fall back to it so the Weighted grade column and the
+  // stats footer stay populated for every row before the second
+  // marker has touched it, and recalculate as they save their own.
+  // For the first marker, r.primary_grade is undefined, so this just
+  // reduces to r.current_grade.
+  const effectiveGrade = (r: GradeRow) =>
+    r.current_grade ?? r.primary_grade ?? null;
   const savedWeighted = showMarkerStats
     ? rows
-        .filter((r) => !r.absent && r.current_grade != null)
+        .filter((r) => !r.absent && effectiveGrade(r) != null)
         .map((r) =>
           computeWeightedGrade(
-            r.current_grade,
+            effectiveGrade(r),
             r.mcq_score ?? null,
             mcqWeighting,
             mcqEnabled,
@@ -504,7 +512,7 @@ export function GradeTable({
                     {r.absent
                       ? "—"
                       : (computeWeightedGrade(
-                          r.current_grade,
+                          effectiveGrade(r),
                           r.mcq_score ?? null,
                           mcqWeighting,
                           mcqEnabled,
