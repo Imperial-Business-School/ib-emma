@@ -163,7 +163,6 @@ export function buildMarkerEmail(opts: {
     ? `${opts.examCode} — ${opts.examName}`
     : opts.examName;
   const greeting = opts.markerName ? `Hi ${opts.markerName}` : "Hi";
-  const greetingLegacy = opts.markerName ? `Hi ${opts.markerName},` : "Hi,";
   const deadlineLine = opts.deadline
     ? `Deadline: 10:00 on ${formatDateOnly(opts.deadline)} (UK time)`
     : "Deadline: not set";
@@ -206,6 +205,37 @@ export function buildMarkerEmail(opts: {
 
   const cc = opts.kind === "late" ? "exam.manager@ic.ac.uk" : undefined;
 
+  const bodyLines: string[] = [
+    greeting,
+    "",
+    "You have not completed marking the following exam and the deadline has passed:",
+    "",
+    `${opts.examName} on ${moduleName}${codeSuffix}`,
+    "",
+    deadlineLine,
+    "",
+  ];
+  if (opts.kind === "late") {
+    bodyLines.push(
+      "Marking is now at least five working days overdue. The exam manager has been copied on this reminder.",
+      "",
+    );
+  }
+  bodyLines.push(
+    "Please submit your grades as soon as possible.",
+    "",
+    "If you need to discuss an extension to the marking deadline, or have any challenges in completing the marking, please get in touch with the Exams team at bs-exams-team@imperial.ac.uk.",
+    "",
+    `Visit this link to submit marks: ${opts.url}`,
+    "",
+    "Thank you,",
+    "",
+    "Exams team",
+    "Imperial Business School",
+    "",
+    "This is an automated notification sent by EMMA. Do not reply. Contact bs-exams-team@imperial.ac.uk for help.",
+  );
+
   return {
     to: opts.markerEmail,
     cc,
@@ -213,23 +243,7 @@ export function buildMarkerEmail(opts: {
     subject,
     kind: `${roleLabel}_${opts.kind}`,
     examId: opts.examId ?? null,
-    body: [
-      greetingLegacy,
-      "",
-      `Your ${roleLabel} marking of ${examLabel} is past the deadline.`,
-      deadlineLine,
-      "",
-      opts.kind === "late"
-        ? "This marking is now at least five working days overdue. The exam manager has been copied on this reminder."
-        : "Please submit your grades as soon as possible.",
-      "",
-      "If you need to discuss an extension to the marking deadline, or have any challenges in completing the marking, please get in touch with the Exams team.",
-      "",
-      `Open the marking screen: ${opts.url}`,
-      "",
-      "Thank you,",
-      "Exam administration",
-    ].join("\n"),
+    body: bodyLines.join("\n"),
   };
 }
 
