@@ -160,6 +160,37 @@ export function GradeTable({
         return;
       }
     }
+    // Second marker: refuse to save when any dirty row has a grade
+    // that differs from the first marker's but no comment. Server
+    // rejects this too, but its error propagates back through the
+    // Server Actions runtime as the generic "an error occurred in the
+    // Server Components render" digest string in production, which
+    // reveals nothing to the marker about what to fix.
+    if (isSecondary && !isResolving) {
+      const rowById = new Map(rows.map((r) => [r.id, r]));
+      const missing: string[] = [];
+      for (const id of ids) {
+        const r = rowById.get(id);
+        if (!r || r.absent) continue;
+        const v = (values[id] ?? "").trim();
+        const c = (comments[id] ?? "").trim();
+        if (
+          v !== "" &&
+          r.primary_grade != null &&
+          v !== r.primary_grade &&
+          c === ""
+        ) {
+          missing.push(r.seat_number);
+        }
+      }
+      if (missing.length > 0) {
+        const plural = missing.length === 1 ? "" : "s";
+        setError(
+          `Add a comment for seat${plural} ${missing.join(", ")} before saving — a comment is required when your grade differs from the first marker's.`,
+        );
+        return;
+      }
+    }
     setPendingIds((prev) => new Set([...prev, ...ids]));
     const updates = ids.map((id) => ({
       id,
