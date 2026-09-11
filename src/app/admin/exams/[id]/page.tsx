@@ -217,6 +217,18 @@ export default async function AdminExamPage({
           </div>
         </>
       )}
+      {exam.status === "complete" && (
+        <div className="rounded-lg border-2 border-green-400 bg-green-50 p-6 text-center shadow-sm">
+          <p className="text-2xl font-bold text-green-800">
+            ✓ Marking complete — ready for Canvas upload
+          </p>
+          <p className="mt-2 text-sm text-green-900">
+            All grades have been finalised. Download the Canvas gradebook
+            using the button at the top right of this page and upload it
+            to Canvas.
+          </p>
+        </div>
+      )}
       <div className="flex items-start justify-between">
         <div>
           <Link href="/admin" className="text-sm text-blue-600 hover:underline">
