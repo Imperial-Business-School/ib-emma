@@ -408,7 +408,7 @@ export function GradeTable({
             )}
             {showPrimary && (
               <SortableTh
-                label="First grade"
+                label="First marker's grade"
                 active={sort.key === "primary_grade"}
                 dir={sort.dir}
                 onClick={() => onSort("primary_grade")}
@@ -417,7 +417,9 @@ export function GradeTable({
             {(isResolving || isSecondary) && (
               <th className="px-4 py-2">Feedback</th>
             )}
-            {showSecondary && <th className="px-4 py-2">Secondary grade</th>}
+            {showSecondary && (
+              <th className="px-4 py-2">Second marker&apos;s grade</th>
+            )}
             {isResolving && <th className="px-4 py-2">Comments</th>}
             {mcqAfterPrimary && (
               <SortableTh
