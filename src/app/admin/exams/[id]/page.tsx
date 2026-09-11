@@ -224,8 +224,8 @@ export default async function AdminExamPage({
           </p>
           <p className="mt-2 text-sm text-green-900">
             All grades have been finalised. Download the Canvas gradebook
-            using the button at the top right of this page and upload it
-            to Canvas.
+            using the button at the top right of this page. Then find this
+            exam on Canvas and import the grades.
           </p>
         </div>
       )}
