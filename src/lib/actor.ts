@@ -3,6 +3,7 @@
 
 import { cookies, headers } from "next/headers";
 import { query, queryOne, type Admin } from "@/lib/db";
+import { basicAuthEnabled, basicAuthUser } from "@/lib/basicAuth";
 import {
   PRINCIPAL_CLAIMS_HEADER,
   PRINCIPAL_HEADER,
@@ -18,7 +19,7 @@ const COOKIE = "emma_actor_id";
 // also arrive without one and would otherwise be silently stamped as an
 // admin override on every save.
 export async function getActingAdmin(): Promise<Admin | null> {
-  const found = authEnforced() ? await fromSignIn() : await fromCookie();
+  const found = await resolve();
   if (!found) return null;
 
   // Fire and forget; don't hold up the page render.
@@ -29,10 +30,17 @@ export async function getActingAdmin(): Promise<Admin | null> {
   return found;
 }
 
-// Authorisation check for API routes, which bypass the layout. Inert until
-// EMMA_REQUIRE_AUTH is on.
+async function resolve(): Promise<Admin | null> {
+  if (authEnforced()) return fromSignIn();
+  if (basicAuthEnabled()) return fromBasicAuth();
+  return fromCookie();
+}
+
+// Authorisation check for API routes, which bypass the layout. Inert while
+// neither perimeter is active.
 export async function adminAllowed(): Promise<boolean> {
-  return !authEnforced() || (await getActingAdmin()) !== null;
+  if (!authEnforced() && !basicAuthEnabled()) return true;
+  return (await getActingAdmin()) !== null;
 }
 
 // Server actions are public endpoints, so they authorise individually rather
@@ -50,6 +58,19 @@ async function fromCookie(): Promise<Admin | null> {
   const found = await queryOne<Admin>(
     "SELECT * FROM admins WHERE id = $1",
     [id],
+  );
+  return found ?? null;
+}
+
+// The middleware has already verified the credential, so this only needs
+// the username it authenticated as.
+async function fromBasicAuth(): Promise<Admin | null> {
+  const email = basicAuthUser((await headers()).get("authorization"));
+  if (!email) return null;
+
+  const found = await queryOne<Admin>(
+    "SELECT * FROM admins WHERE lower(email) = $1",
+    [email],
   );
   return found ?? null;
 }
