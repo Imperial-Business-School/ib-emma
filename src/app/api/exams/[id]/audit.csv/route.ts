@@ -9,6 +9,7 @@ import {
   type User,
 } from "@/lib/db";
 import { toCsv } from "@/lib/csv";
+import { formatDateOnly } from "@/lib/datetime";
 import { computeWeightedGrade } from "@/lib/weighted";
 import { SEAT_ORDER_ASC } from "@/lib/seatSort";
 
@@ -51,6 +52,7 @@ export async function GET(
 
   const meta = [
     ["# Exam", exam.name],
+    ["# Exam date", exam.exam_date ? formatDateOnly(exam.exam_date) : ""],
     ["# Code", exam.code ?? ""],
     ["# Module name", exam.module_name ?? ""],
     ["# Academic year", exam.academic_year ?? ""],
