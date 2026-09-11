@@ -2,8 +2,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { PRINCIPAL_HEADER, authEnforced } from "@/lib/easyAuth";
 
 // Marker access is by unguessable token, not by login, so those routes stay
-// anonymous. The grades template is column headers only -- no CIDs.
-const ANONYMOUS = [/^\/m\//, /^\/api\/exams\/\d+\/grades-template\.csv$/];
+// anonymous.
+const ANONYMOUS = [/^\/m\//];
 
 export function middleware(req: NextRequest) {
   if (!authEnforced()) return NextResponse.next();
