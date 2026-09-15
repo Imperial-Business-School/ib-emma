@@ -36,10 +36,15 @@ async function resolve(): Promise<Admin | null> {
   return fromCookie();
 }
 
+// True when identity comes from a login rather than the acting-as cookie.
+export function signInRequired(): boolean {
+  return authEnforced() || basicAuthEnabled();
+}
+
 // Authorisation check for API routes, which bypass the layout. Inert while
 // neither perimeter is active.
 export async function adminAllowed(): Promise<boolean> {
-  if (!authEnforced() && !basicAuthEnabled()) return true;
+  if (!signInRequired()) return true;
   return (await getActingAdmin()) !== null;
 }
 

@@ -1,7 +1,6 @@
 import Link from "next/link";
-import { getActingAdmin, getAllAdmins } from "@/lib/actor";
+import { getActingAdmin, getAllAdmins, signInRequired } from "@/lib/actor";
 import type { Admin } from "@/lib/db";
-import { authEnforced } from "@/lib/easyAuth";
 import { ActingAsPicker } from "./admin/ActingAsPicker";
 
 // Shared header + main container used by both /admin and /exams routes.
@@ -57,16 +56,16 @@ export default async function AdminChrome({
         </div>
       </header>
       <main className="mx-auto max-w-screen-2xl px-6 py-8">
-        {authEnforced() && !current ? <NotAuthorised /> : children}
+        {signInRequired() && !current ? <NotAuthorised /> : children}
       </main>
     </>
   );
 }
 
-// Signed-in name once Easy Auth is enforcing, the acting-as picker before
+// Signed-in name once a login is required, the acting-as picker before
 // then. The admin list is only needed by the picker.
 async function Identity({ current }: { current: Admin | null }) {
-  if (authEnforced()) {
+  if (signInRequired()) {
     if (!current) return null;
     return <span className="text-xs text-slate-500">{current.name}</span>;
   }
