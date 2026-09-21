@@ -12,7 +12,7 @@ import {
   type EmailTemplateKind,
 } from "@/lib/emailTemplateKinds";
 import { parseTabularFile } from "@/lib/tabular";
-import { SAVE_STATE_INITIAL, toErrorState, type SaveState } from "@/lib/actionState";
+import { toErrorState, type SaveState } from "@/lib/actionState";
 
 const YES_VALUES = new Set(["y", "yes", "true", "1"]);
 const NO_VALUES = new Set(["n", "no", "false", "0", ""]);
@@ -162,7 +162,3 @@ export async function uploadEmailTemplatesAction(
     return toErrorState(e);
   }
 }
-
-// Convenience: expose the initial SaveState so client components don't
-// need to import it separately.
-export const INITIAL_SAVE_STATE = SAVE_STATE_INITIAL;
