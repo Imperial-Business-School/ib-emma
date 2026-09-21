@@ -116,6 +116,14 @@ export default async function EmailsPage({
           SMTP delivery is stubbed. Use this view to verify invitations and
           reminders, and as an audit trail.
         </p>
+        <p className="mt-2 text-sm">
+          <Link
+            href="/admin/emails/templates"
+            className="text-blue-600 hover:underline"
+          >
+            Edit email templates →
+          </Link>
+        </p>
       </div>
 
       <EmailLogFilters

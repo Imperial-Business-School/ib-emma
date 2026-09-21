@@ -5,6 +5,12 @@ import {
   type ExamStatus,
 } from "@/lib/examStatus";
 import { endOfDeadlineDay, formatDateOnly } from "@/lib/datetime";
+import {
+  getTemplate,
+  renderCcList,
+  renderTemplate,
+} from "@/lib/emailTemplates";
+import type { EmailTemplateKind } from "@/lib/emailTemplateKinds";
 
 // Number of working days after the deadline before status flips from
 // "overdue" to "late".
@@ -143,9 +149,11 @@ export async function recordEmail(e: EmailToSend): Promise<void> {
 /** @deprecated Use recordEmail instead. */
 export const logStubEmail = recordEmail;
 
-// Build the textual content of a marker notification email. Used for both
-// the "commence marking" and the "overdue" reminder paths.
-export function buildMarkerEmail(opts: {
+// Build the textual content of a marker notification email using the
+// stored template for the given (role, kind) combination. Placeholders
+// are substituted at send time; unknown or out-of-context tokens render
+// as empty strings.
+export async function buildMarkerEmail(opts: {
   kind: "commence" | "overdue" | "late";
   markerName: string | null;
   markerEmail: string;
@@ -153,97 +161,43 @@ export function buildMarkerEmail(opts: {
   examCode: string | null;
   moduleName: string | null;
   role: "primary" | "secondary";
-  // Deadline is now a bare UK calendar date ('YYYY-MM-DD'). Overdue is
-  // any point past midnight UK following that date.
+  // Deadline is a bare UK calendar date ('YYYY-MM-DD'). Overdue is any
+  // point past midnight UK following that date.
   deadline: string | null;
   url: string;
   examId?: number;
-}): EmailToSend {
-  const examLabel = opts.examCode
-    ? `${opts.examCode} — ${opts.examName}`
-    : opts.examName;
-  const greeting = opts.markerName ? `Hi ${opts.markerName}` : "Hi";
-  const deadlineLine = opts.deadline
-    ? `Deadline: 10:00 on ${formatDateOnly(opts.deadline)} (UK time)`
-    : "Deadline: not set";
+  // Optional CC recipient overrides used by the "late" path; passed as
+  // an already-resolved comma-separated list.
+  ccOverride?: string | undefined;
+}): Promise<EmailToSend> {
   const roleLabel = opts.role === "primary" ? "first" : "second";
-  const moduleName = opts.moduleName ?? opts.examName;
-  const codeSuffix = opts.examCode ? ` (${opts.examCode})` : "";
+  const templateKind = `${roleLabel}_${opts.kind}` as EmailTemplateKind;
+  const template = await getTemplate(templateKind);
 
-  if (opts.kind === "commence") {
-    return {
-      to: opts.markerEmail,
-      subject: `Exam marking: please begin marking ${opts.examName} for ${moduleName}`,
-      kind: `${roleLabel}_commence`,
-      examId: opts.examId ?? null,
-      body: [
-        greeting,
-        "",
-        `You have been assigned as the ${roleLabel} marker for ${opts.examName} on ${moduleName}${codeSuffix}.`,
-        "",
-        deadlineLine,
-        "",
-        `Visit this link to submit marks: ${opts.url}`,
-        "",
-        "The Exams team will provide you with the exam scripts or Wiseflow link separately.",
-        "",
-        "Thank you,",
-        "",
-        "Exams team",
-        "Imperial Business School",
-        "",
-        "This is an automated notification sent by EMMA. Do not reply. Contact bs-exams-team@imperial.ac.uk for help.",
-      ].join("\n"),
-    };
-  }
+  const vars = {
+    marker_name: opts.markerName ?? "there",
+    role: roleLabel,
+    Role: roleLabel === "first" ? "First" : "Second",
+    exam_name: opts.examName,
+    exam_code: opts.examCode ?? "",
+    module_name: opts.moduleName ?? opts.examName,
+    module_code: opts.examCode ?? "",
+    deadline: opts.deadline ? formatDateOnly(opts.deadline) : "not set",
+    link: opts.url,
+    support_email: "bs-exams-team@imperial.ac.uk",
+  };
 
-  const urgent = true;
-  const subject =
-    opts.kind === "overdue"
-      ? `URGENT: ${roleLabel === "first" ? "First" : "Second"} marking overdue — ${examLabel}`
-      : `URGENT: ${roleLabel === "first" ? "First" : "Second"} marking late — ${examLabel}`;
-
-  const cc = opts.kind === "late" ? "exam.manager@ic.ac.uk" : undefined;
-
-  const bodyLines: string[] = [
-    greeting,
-    "",
-    "You have not completed marking the following exam and the deadline has passed:",
-    "",
-    `${opts.examName} on ${moduleName}${codeSuffix}`,
-    "",
-    deadlineLine,
-    "",
-  ];
-  if (opts.kind === "late") {
-    bodyLines.push(
-      "Marking is now at least five working days overdue. The exam manager has been copied on this reminder.",
-      "",
-    );
-  }
-  bodyLines.push(
-    "Please submit your grades as soon as possible.",
-    "",
-    "If you need to discuss an extension to the marking deadline, or have any challenges in completing the marking, please get in touch with the Exams team at bs-exams-team@imperial.ac.uk.",
-    "",
-    `Visit this link to submit marks: ${opts.url}`,
-    "",
-    "Thank you,",
-    "",
-    "Exams team",
-    "Imperial Business School",
-    "",
-    "This is an automated notification sent by EMMA. Do not reply. Contact bs-exams-team@imperial.ac.uk for help.",
-  );
+  const cc =
+    opts.ccOverride ?? renderCcList(template.cc, {}) ?? undefined;
 
   return {
     to: opts.markerEmail,
     cc,
-    urgent,
-    subject,
-    kind: `${roleLabel}_${opts.kind}`,
+    urgent: template.urgent,
+    subject: renderTemplate(template.subject, vars),
+    body: renderTemplate(template.body, vars),
+    kind: templateKind,
     examId: opts.examId ?? null,
-    body: bodyLines.join("\n"),
   };
 }
 
@@ -382,7 +336,7 @@ async function handlePhase(args: {
   const url = markerUrl(origin, exam.id, token);
   if (!alreadyNotifiedOverdue) {
     await recordEmail(
-      buildMarkerEmail({
+      await buildMarkerEmail({
         kind: "overdue",
         markerName: marker.name,
         markerEmail: marker.email,
@@ -403,7 +357,7 @@ async function handlePhase(args: {
   }
   if (isLate && !alreadyNotifiedLate) {
     await recordEmail(
-      buildMarkerEmail({
+      await buildMarkerEmail({
         kind: "late",
         markerName: marker.name,
         markerEmail: marker.email,

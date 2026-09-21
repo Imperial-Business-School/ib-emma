@@ -154,6 +154,17 @@ async function initSchema(): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_email_log_recipient ON email_log(lower(recipient));
     CREATE INDEX IF NOT EXISTS idx_email_log_exam ON email_log(exam_id);
 
+    CREATE TABLE IF NOT EXISTS email_templates (
+      kind TEXT PRIMARY KEY,
+      subject TEXT NOT NULL,
+      body TEXT NOT NULL,
+      cc TEXT,
+      urgent BOOLEAN NOT NULL DEFAULT false,
+      description TEXT,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_by TEXT
+    );
+
     -- One-off migration: back-fill the "primary"/"secondary" wording in
     -- historical email_log rows so the log matches the new "first"/"second"
     -- terminology used in freshly-built emails. Idempotent: the WHERE
@@ -293,6 +304,32 @@ async function initSchema(): Promise<void> {
       END IF;
     END $$;
   `);
+
+  await seedEmailTemplates();
+}
+
+// Insert any missing rows into email_templates from the defaults. Only
+// touches kinds that have no row yet -- an admin's edits are never
+// overwritten by this. Safe to run on every cold start.
+async function seedEmailTemplates(): Promise<void> {
+  const { DEFAULT_TEMPLATES } = await import("./emailDefaults");
+  const { KIND_DESCRIPTIONS } = await import("./emailTemplateKinds");
+  const pool = getPool();
+  for (const [kind, tpl] of Object.entries(DEFAULT_TEMPLATES)) {
+    await pool.query(
+      `INSERT INTO email_templates (kind, subject, body, cc, urgent, description)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       ON CONFLICT (kind) DO NOTHING`,
+      [
+        kind,
+        tpl.subject,
+        tpl.body,
+        tpl.cc,
+        tpl.urgent,
+        KIND_DESCRIPTIONS[kind as keyof typeof KIND_DESCRIPTIONS] ?? null,
+      ],
+    );
+  }
 }
 
 export function randomToken(): string {
@@ -425,4 +462,15 @@ export type EmailLog = {
   exam_id: number | null;
   kind: string | null;
   delivery_status: string;
+};
+
+export type EmailTemplateRow = {
+  kind: string;
+  subject: string;
+  body: string;
+  cc: string | null;
+  urgent: boolean;
+  description: string | null;
+  updated_at: string;
+  updated_by: string | null;
 };

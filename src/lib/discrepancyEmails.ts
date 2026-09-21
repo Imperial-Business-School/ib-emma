@@ -1,14 +1,14 @@
 import { query, queryOne, type Exam } from "./db";
 import { recordEmail, markerUrl } from "./deadlines";
 import { getRequestOrigin } from "./origin";
+import { getTemplate, renderCcList, renderTemplate } from "./emailTemplates";
 
-// Emails sent when the second marker submits and the app decides
-// where to route the exam next -- either to the first marker for
-// discrepancy resolution, or to every admin when the discrepancy
-// rate is high enough to need admin attention. Both use the wording
-// dictated by the exam admins; both are recorded via the shared
-// email_log plumbing so they show up in the admin email log alongside
-// commence/overdue notifications.
+// Emails sent when the second marker submits and the app decides where
+// to route the exam next -- either to the first marker for discrepancy
+// resolution, or to every admin when the discrepancy rate is high enough
+// to need admin attention. Also the exam-complete fanout. Every message
+// pulls its subject / body / cc from the admin-editable email_templates
+// table via getTemplate, so wording changes ship without a redeploy.
 
 type EmailContext = {
   examId: number;
@@ -32,6 +32,8 @@ async function loadExamContext(examId: number): Promise<{
   };
 }
 
+const SUPPORT_EMAIL = "bs-exams-team@imperial.ac.uk";
+
 export async function notifyFirstMarkerOfDiscrepancies({
   examId,
   differed,
@@ -48,9 +50,6 @@ export async function notifyFirstMarkerOfDiscrepancies({
   );
   if (!marker) return;
 
-  // CC the second marker so they can see the resolution being kicked
-  // off. May be missing if the exam was created without a second
-  // marker on file, in which case we just omit the cc.
   const secondMarker = exam.secondary_marker_id
     ? await queryOne<{ email: string }>(
         "SELECT email FROM users WHERE id = $1",
@@ -59,68 +58,79 @@ export async function notifyFirstMarkerOfDiscrepancies({
     : null;
 
   const origin = await getRequestOrigin();
-  const link = markerUrl(origin, exam.id, exam.primary_access_token);
-  const codeSuffix = moduleCode ? ` (${moduleCode})` : "";
-  const subject = `Exam marking: please resolve grade discrepancies [${moduleName}, ${exam.name}]`;
-  const body = [
-    marker.name ? `Hi ${marker.name},` : "Hi,",
-    "",
-    `The second marker has completed their marking of ${exam.name} in ${moduleName}${codeSuffix}. ${differed} of ${total} grades differed from the grades you provided. Please check their grades and comments, then provide a final grade using this link: ${link}.`,
-    "",
-    "Thank you,",
-    "Exam administration",
-  ].join("\n");
+  const template = await getTemplate("first_marker_review");
+  const vars = {
+    marker_name: marker.name ?? "there",
+    exam_name: exam.name,
+    module_name: moduleName,
+    module_code: moduleCode,
+    differed,
+    total,
+    link: markerUrl(origin, exam.id, exam.primary_access_token),
+    support_email: SUPPORT_EMAIL,
+  };
+  const cc = renderCcList(template.cc, {
+    secondMarkerEmail: secondMarker?.email ?? null,
+  });
 
   await recordEmail({
     to: marker.email,
-    cc: secondMarker?.email,
-    subject,
-    body,
+    cc,
+    subject: renderTemplate(template.subject, vars),
+    body: renderTemplate(template.body, vars),
+    urgent: template.urgent,
     examId: exam.id,
     kind: "first_marker_review",
   });
 }
 
-// Fired whenever an exam transitions into 'complete': either the
-// first marker submits Final Marks, the second marker submits with
-// no discrepancies, or an admin fills in the last final grade on an
-// admin_check_required / review exam. One email per admin, so the
-// Exams team knows the grades are ready to upload to Canvas.
+// One-shot admin fanout used by both admin_check_required and
+// exam_complete. First admin (alphabetical by name) lands in To; the
+// rest are rolled into CC by the template's {other_admins} token.
+async function fanoutToAdmins(params: {
+  templateKind: "admin_check_required" | "exam_complete";
+  examId: number;
+  vars: Record<string, string | number | null | undefined>;
+}): Promise<void> {
+  const admins = await query<{ email: string; name: string }>(
+    "SELECT email, name FROM admins ORDER BY lower(name)",
+  );
+  if (admins.length === 0) return;
+
+  const template = await getTemplate(params.templateKind);
+  const [primary, ...rest] = admins;
+  const cc = renderCcList(template.cc, {
+    otherAdminEmails: rest.map((a) => a.email),
+  });
+
+  await recordEmail({
+    to: primary.email,
+    cc,
+    subject: renderTemplate(template.subject, params.vars),
+    body: renderTemplate(template.body, params.vars),
+    urgent: template.urgent,
+    examId: params.examId,
+    kind: params.templateKind,
+  });
+}
+
 export async function notifyAdminsOfExamComplete(
   examId: number,
 ): Promise<void> {
   const ctx = await loadExamContext(examId);
   if (!ctx) return;
   const { exam, moduleName, moduleCode } = ctx;
-
-  const admins = await query<{ email: string; name: string }>(
-    "SELECT email, name FROM admins ORDER BY lower(name)",
-  );
-  if (admins.length === 0) return;
-
   const origin = await getRequestOrigin();
-  const link = `${origin}/admin/exams/${exam.id}`;
-  const codeSuffix = moduleCode ? ` (${moduleCode})` : "";
-  const subject = `Exam marking completed for ${exam.name} on ${moduleName}${codeSuffix}`;
-  const body = [
-    "Hello,",
-    "",
-    "The first and second markers have completed marking for this exam. Please carry out final checks, download the final grades spreadsheet, and upload grades to Canvas.",
-    "",
-    `Link to exam admin page: ${link}`,
-    "",
-    "Thank you,",
-    "Exam administration",
-  ].join("\n");
-
-  const [primary, ...rest] = admins;
-  await recordEmail({
-    to: primary.email,
-    cc: rest.length > 0 ? rest.map((a) => a.email).join(", ") : undefined,
-    subject,
-    body,
-    examId: exam.id,
-    kind: "exam_complete",
+  await fanoutToAdmins({
+    templateKind: "exam_complete",
+    examId,
+    vars: {
+      exam_name: exam.name,
+      module_name: moduleName,
+      module_code: moduleCode,
+      link: `${origin}/admin/exams/${exam.id}`,
+      support_email: SUPPORT_EMAIL,
+    },
   });
 }
 
@@ -132,38 +142,18 @@ export async function notifyAdminsOfCheckRequired({
   const ctx = await loadExamContext(examId);
   if (!ctx) return;
   const { exam, moduleName, moduleCode } = ctx;
-
-  const admins = await query<{ email: string; name: string }>(
-    "SELECT email, name FROM admins ORDER BY lower(name)",
-  );
-  if (admins.length === 0) return;
-
   const origin = await getRequestOrigin();
-  const link = `${origin}/admin/exams/${exam.id}`;
-  const codeSuffix = moduleCode ? ` (${moduleCode})` : "";
-  const codeSubject = moduleCode ? `, ${moduleCode}` : "";
-  const subject = `Exam marking: grade discrepancies - admin check required (${moduleName}${codeSubject}, ${exam.name})`;
-  const body = [
-    "Hi,",
-    "",
-    `Second marking is complete on ${exam.name} on ${moduleName}${codeSuffix}.`,
-    "",
-    `${differed} of ${total} grades differ between first and second marker. Please review the exam grades and discuss with both markers.`,
-    "",
-    link,
-    "",
-    "Thank you,",
-    "Exam administration",
-  ].join("\n");
-
-  const [primary, ...rest] = admins;
-  await recordEmail({
-    to: primary.email,
-    cc: rest.length > 0 ? rest.map((a) => a.email).join(", ") : undefined,
-    subject,
-    body,
-    examId: exam.id,
-    kind: "admin_check_required",
-    urgent: true,
+  await fanoutToAdmins({
+    templateKind: "admin_check_required",
+    examId,
+    vars: {
+      exam_name: exam.name,
+      module_name: moduleName,
+      module_code: moduleCode,
+      differed,
+      total,
+      link: `${origin}/admin/exams/${exam.id}`,
+      support_email: SUPPORT_EMAIL,
+    },
   });
 }

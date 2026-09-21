@@ -792,7 +792,7 @@ export async function startPrimaryMarkingAction(examId: number) {
   if (marker) {
     const origin = await getRequestOrigin();
     await recordEmail(
-      buildMarkerEmail({
+      await buildMarkerEmail({
         kind: "commence",
         markerName: marker.name,
         markerEmail: marker.email,
@@ -888,7 +888,7 @@ export async function startSecondaryMarkingAction(examId: number) {
     if (marker) {
       const origin = await getRequestOrigin();
       await recordEmail(
-        buildMarkerEmail({
+        await buildMarkerEmail({
           kind: "commence",
           markerName: marker.name,
           markerEmail: marker.email,
