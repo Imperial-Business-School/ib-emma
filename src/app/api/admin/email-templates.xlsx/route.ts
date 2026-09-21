@@ -66,8 +66,7 @@ export async function GET() {
   ];
   const PLACEHOLDER_HINTS: Record<string, [string, string]> = {
     marker_name: ["Body/subject", "The recipient marker's name (falls back to \"there\")."],
-    role: ["Body/subject", 'The marker\'s role, lowercase: "first" or "second".'],
-    Role: ["Body/subject", 'The marker\'s role, capitalised: "First" or "Second".'],
+    role: ["Body/subject", 'The marker\'s role — "first" or "second".'],
     exam_name: ["Body/subject", "The exam name."],
     module_name: ["Body/subject", "The full module name."],
     module_code: ["Body/subject", "The module short code (e.g. BUSI70001)."],

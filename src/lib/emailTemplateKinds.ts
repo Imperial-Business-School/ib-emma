@@ -48,7 +48,6 @@ export const PLACEHOLDERS: Record<EmailTemplateKind, readonly string[]> = {
   first_commence: [
     "marker_name",
     "role",
-    "Role",
     "exam_name",
     "module_name",
     "module_code",
@@ -59,7 +58,6 @@ export const PLACEHOLDERS: Record<EmailTemplateKind, readonly string[]> = {
   second_commence: [
     "marker_name",
     "role",
-    "Role",
     "exam_name",
     "module_name",
     "module_code",
@@ -70,7 +68,6 @@ export const PLACEHOLDERS: Record<EmailTemplateKind, readonly string[]> = {
   first_overdue: [
     "marker_name",
     "role",
-    "Role",
     "exam_name",
     "module_name",
     "module_code",
@@ -81,7 +78,6 @@ export const PLACEHOLDERS: Record<EmailTemplateKind, readonly string[]> = {
   second_overdue: [
     "marker_name",
     "role",
-    "Role",
     "exam_name",
     "module_name",
     "module_code",
@@ -92,7 +88,6 @@ export const PLACEHOLDERS: Record<EmailTemplateKind, readonly string[]> = {
   first_late: [
     "marker_name",
     "role",
-    "Role",
     "exam_name",
     "module_name",
     "module_code",
@@ -103,7 +98,6 @@ export const PLACEHOLDERS: Record<EmailTemplateKind, readonly string[]> = {
   second_late: [
     "marker_name",
     "role",
-    "Role",
     "exam_name",
     "module_name",
     "module_code",
@@ -156,8 +150,7 @@ export const CC_PLACEHOLDERS: Record<EmailTemplateKind, readonly string[]> = {
 
 export const PLACEHOLDER_HINTS: Record<string, string> = {
   marker_name: "The recipient marker's name.",
-  role: 'The marker\'s role in lowercase — "first" or "second".',
-  Role: 'The marker\'s role capitalised — "First" or "Second".',
+  role: 'The marker\'s role — "first" or "second".',
   exam_name: "The exam's name.",
   module_name: "The module's full name.",
   module_code: "The module's short code (e.g. BUSI70001).",

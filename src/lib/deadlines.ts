@@ -177,7 +177,6 @@ export async function buildMarkerEmail(opts: {
   const vars = {
     marker_name: opts.markerName ?? "there",
     role: roleLabel,
-    Role: roleLabel === "first" ? "First" : "Second",
     exam_name: opts.examName,
     exam_code: opts.examCode ?? "",
     module_name: opts.moduleName ?? opts.examName,
