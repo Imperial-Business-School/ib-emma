@@ -7,6 +7,8 @@ import {
 import { formatDateTime } from "@/lib/datetime";
 import { EmailLogFilters } from "./EmailLogFilters";
 
+import { setEmailSentAction } from "./actions";
+
 export const dynamic = "force-dynamic";
 
 const PAGE_SIZE_DEFAULT = 25;
@@ -30,6 +32,27 @@ function parseInt1(v: string | undefined, fallback: number): number {
 }
 
 type EmailRow = EmailLog & { exam_name: string | null; exam_code: string | null };
+
+// The app never actually sends: recordEmail() logs with delivery_status
+// 'stub'. This opens the composed message in the admin's own mail client so
+// it goes out from a real Imperial address.
+function mailtoHref(r: {
+  recipient: string;
+  cc: string | null;
+  subject: string;
+  body: string;
+}): string {
+  // Not URLSearchParams: it encodes spaces as "+", which mail clients show
+  // literally rather than as spaces.
+  const parts = [
+    `subject=${encodeURIComponent(r.subject)}`,
+    `body=${encodeURIComponent(r.body.replace(/\r?\n/g, "\r\n"))}`,
+  ];
+  if (r.cc) parts.push(`cc=${encodeURIComponent(r.cc)}`);
+
+  const to = encodeURIComponent(r.recipient).replace(/%40/g, "@");
+  return `mailto:${to}?${parts.join("&")}`;
+}
 
 export default async function EmailsPage({
   searchParams,
@@ -83,6 +106,10 @@ export default async function EmailsPage({
     listParams,
   );
 
+  const unsent = await queryOne<{ n: number }>(
+    `SELECT COUNT(*)::int AS n FROM email_log WHERE delivery_status = 'stub'`,
+  );
+
   // Distinct kinds for the filter dropdown.
   const kinds = await query<{ kind: string }>(
     `SELECT DISTINCT kind FROM email_log WHERE kind IS NOT NULL ORDER BY kind`,
@@ -116,6 +143,12 @@ export default async function EmailsPage({
           SMTP delivery is stubbed. Use this view to verify invitations and
           reminders, and as an audit trail.
         </p>
+        {(unsent?.n ?? 0) > 0 && (
+          <p className="mt-2 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            {unsent?.n} still to send. Open each one in your mail client,
+            send it, then mark it sent.
+          </p>
+        )}
         <p className="mt-2 text-sm">
           <Link
             href="/admin/emails/templates"
@@ -154,13 +187,14 @@ export default async function EmailsPage({
               <th className="px-4 py-2 w-40">Kind</th>
               <th className="px-4 py-2 w-48">Exam</th>
               <th className="px-4 py-2 w-24">Status</th>
+              <th className="px-4 py-2 w-20">Send</th>
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 && (
               <tr>
                 <td
-                  colSpan={6}
+                  colSpan={7}
                   className="px-4 py-8 text-center text-slate-500"
                 >
                   No emails yet. Trigger one by starting marking on an exam,
@@ -224,6 +258,27 @@ export default async function EmailsPage({
                   >
                     {r.delivery_status}
                   </span>
+                </td>
+                <td className="px-4 py-2 text-xs">
+                  <a
+                    href={mailtoHref(r)}
+                    className="text-blue-600 hover:underline"
+                  >
+                    Open
+                  </a>
+                  <form
+                    action={async () => {
+                      "use server";
+                      await setEmailSentAction(r.id, r.delivery_status !== "sent");
+                    }}
+                  >
+                    <button
+                      type="submit"
+                      className="mt-1 text-slate-500 hover:text-slate-900 hover:underline"
+                    >
+                      {r.delivery_status === "sent" ? "Undo" : "Mark sent"}
+                    </button>
+                  </form>
                 </td>
               </tr>
             ))}
