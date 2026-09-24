@@ -31,6 +31,27 @@ function parseInt1(v: string | undefined, fallback: number): number {
 
 type EmailRow = EmailLog & { exam_name: string | null; exam_code: string | null };
 
+// The app never actually sends: recordEmail() logs with delivery_status
+// 'stub'. This opens the composed message in the admin's own mail client so
+// it goes out from a real Imperial address.
+function mailtoHref(r: {
+  recipient: string;
+  cc: string | null;
+  subject: string;
+  body: string;
+}): string {
+  // Not URLSearchParams: it encodes spaces as "+", which mail clients show
+  // literally rather than as spaces.
+  const query = [
+    `subject=${encodeURIComponent(r.subject)}`,
+    `body=${encodeURIComponent(r.body.replace(/\r?\n/g, "\r\n"))}`,
+  ];
+  if (r.cc) query.push(`cc=${encodeURIComponent(r.cc)}`);
+
+  const to = encodeURIComponent(r.recipient).replace(/%40/g, "@");
+  return `mailto:${to}?${query.join("&")}`;
+}
+
 export default async function EmailsPage({
   searchParams,
 }: {
@@ -154,13 +175,14 @@ export default async function EmailsPage({
               <th className="px-4 py-2 w-40">Kind</th>
               <th className="px-4 py-2 w-48">Exam</th>
               <th className="px-4 py-2 w-24">Status</th>
+              <th className="px-4 py-2 w-20">Send</th>
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 && (
               <tr>
                 <td
-                  colSpan={6}
+                  colSpan={7}
                   className="px-4 py-8 text-center text-slate-500"
                 >
                   No emails yet. Trigger one by starting marking on an exam,
@@ -224,6 +246,14 @@ export default async function EmailsPage({
                   >
                     {r.delivery_status}
                   </span>
+                </td>
+                <td className="px-4 py-2 text-xs">
+                  <a
+                    href={mailtoHref(r)}
+                    className="text-blue-600 hover:underline"
+                  >
+                    Open
+                  </a>
                 </td>
               </tr>
             ))}
