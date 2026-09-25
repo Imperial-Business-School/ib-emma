@@ -2,13 +2,10 @@ import { NextResponse, type NextRequest } from "next/server";
 import { basicAuthEnabled, verifyBasicAuth } from "@/lib/basicAuth";
 import { PRINCIPAL_HEADER, authEnforced } from "@/lib/easyAuth";
 
-// Marker access is by unguessable token, not by login, so those routes stay
-// anonymous.
-const ANONYMOUS = [/^\/m\//];
-
+// Everything is behind the perimeter, marker token URLs included: the token
+// alone is no longer enough to write a grade.
 export async function middleware(req: NextRequest) {
   const { pathname, search } = req.nextUrl;
-  if (ANONYMOUS.some((r) => r.test(pathname))) return NextResponse.next();
 
   if (authEnforced()) {
     if (req.headers.get(PRINCIPAL_HEADER)) return NextResponse.next();
