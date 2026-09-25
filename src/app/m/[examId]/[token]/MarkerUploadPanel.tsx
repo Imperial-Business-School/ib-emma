@@ -2,7 +2,7 @@
 
 import { useRef, useState, useTransition } from "react";
 import {
-  clearMarksByTokenAction,
+  clearMarksByTokenActionState,
   uploadGradesCsvByTokenAction,
 } from "./actions";
 
@@ -60,11 +60,11 @@ export function MarkerUploadPanel({
     setError(null);
     setSummary(null);
     startTransition(async () => {
-      try {
-        await clearMarksByTokenAction(examId, token);
+      const result = await clearMarksByTokenActionState(examId, token);
+      if (result.ok && result.error === null) {
         setSummary("All grades cleared.");
-      } catch (err) {
-        setError(err instanceof Error ? err.message : String(err));
+      } else {
+        setError(result.error ?? "Failed to clear grades.");
       }
     });
   }

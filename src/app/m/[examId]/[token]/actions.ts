@@ -508,12 +508,19 @@ export async function uploadGradesCsvByTokenAction(
 
 // Clear every grade + comment written by the current marker for this exam.
 // Locked once the marker has clicked their 'Marking Complete' button.
+// Admins acting via the marker URL can clear at any exam status so they
+// can reset a mis-configured setup without waiting for the marking phase.
 export async function clearMarksByTokenAction(
   examId: number,
   token: string,
 ) {
   const { exam, role } = await authorize(examId, token);
-  if (!isInMarkerPhase(role, exam.status)) {
+
+  const { getActingAdmin } = await import("@/lib/actor");
+  const actingAdmin = await getActingAdmin();
+  const isAdminOverride = actingAdmin != null;
+
+  if (!isAdminOverride && !isInMarkerPhase(role, exam.status)) {
     throw new Error("Marking is not open — cannot clear grades now");
   }
   if (role === "primary") {
@@ -534,6 +541,21 @@ export async function clearMarksByTokenAction(
     );
   }
   revalidatePath(`/m/${examId}/${token}`);
+}
+
+// State-returning wrapper so client components can render any thrown
+// validation error inline rather than tripping Next.js's generic
+// "server components render" digest page.
+export async function clearMarksByTokenActionState(
+  examId: number,
+  token: string,
+): Promise<SaveState> {
+  try {
+    await clearMarksByTokenAction(examId, token);
+    return { ok: true, error: null };
+  } catch (e) {
+    return toErrorState(e);
+  }
 }
 
 // Primary marker finishes first-pass marking.
