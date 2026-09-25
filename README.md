@@ -1,4 +1,4 @@
-# EMMA — Exam Marking & Moderation App
+# EMMS — Exam Marking and Moderation System
 
 A small web app that replaces the email-spreadsheet workflow used for anonymous
 exam marking at university. Students write their **seat number** on their

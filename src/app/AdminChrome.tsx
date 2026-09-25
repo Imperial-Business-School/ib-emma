@@ -19,11 +19,11 @@ export default async function AdminChrome({
           <Link
             href="/admin"
             className="flex items-baseline gap-2 text-lg font-semibold"
-            title="Exam Marking & Moderation App"
+            title="Exam Marking and Moderation System"
           >
-            <span>EMMA</span>
+            <span>EMMS</span>
             <span className="hidden text-xs font-normal text-slate-500 sm:inline">
-              Exam Marking &amp; Moderation App
+              Exam Marking and Moderation System
             </span>
           </Link>
           <nav className="flex items-center gap-4 text-sm">
@@ -84,7 +84,7 @@ function NotAuthorised() {
     <div className="rounded border border-amber-300 bg-amber-50 p-6">
       <h1 className="text-lg font-semibold">Not authorised</h1>
       <p className="mt-2 text-sm text-slate-700">
-        You are signed in, but your account is not on the EMMA admin list. Ask
+        You are signed in, but your account is not on the EMMS admin list. Ask
         an existing admin to add you.
       </p>
     </div>

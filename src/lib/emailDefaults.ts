@@ -28,7 +28,7 @@ const COMMENCE_BODY = [
   "Exams team",
   "Imperial Business School",
   "",
-  "This is an automated notification sent by EMMA. Do not reply. Contact {support_email} for help.",
+  "This is an automated notification sent by EMMS. Do not reply. Contact {support_email} for help.",
 ].join("\n");
 
 const OVERDUE_BODY = [
@@ -51,7 +51,7 @@ const OVERDUE_BODY = [
   "Exams team",
   "Imperial Business School",
   "",
-  "This is an automated notification sent by EMMA. Do not reply. Contact {support_email} for help.",
+  "This is an automated notification sent by EMMS. Do not reply. Contact {support_email} for help.",
 ].join("\n");
 
 const LATE_BODY = [
@@ -76,7 +76,7 @@ const LATE_BODY = [
   "Exams team",
   "Imperial Business School",
   "",
-  "This is an automated notification sent by EMMA. Do not reply. Contact {support_email} for help.",
+  "This is an automated notification sent by EMMS. Do not reply. Contact {support_email} for help.",
 ].join("\n");
 
 const FIRST_MARKER_REVIEW_BODY = [

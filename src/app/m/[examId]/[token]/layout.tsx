@@ -7,9 +7,9 @@ export default function MarkerByTokenLayout({
     <main className="mx-auto max-w-screen-2xl px-6 py-8">
       <p
         className="mb-6 text-xs uppercase tracking-wide text-slate-400"
-        title="Exam Marking & Moderation App"
+        title="Exam Marking and Moderation System"
       >
-        EMMA — Exam Marking &amp; Moderation
+        EMMS — Exam Marking and Moderation System
       </p>
       {children}
     </main>

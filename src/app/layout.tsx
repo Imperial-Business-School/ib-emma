@@ -2,7 +2,7 @@ import "./globals.css";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "EMMA — Exam Marking & Moderation App",
+  title: "EMMS — Exam Marking and Moderation System",
   description: "CID-seat anonymous grading tool",
 };
 
