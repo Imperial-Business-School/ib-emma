@@ -44,6 +44,7 @@ import {
   SEAT_ORDER_DESC,
 } from "@/lib/seatSort";
 import { McqUploadPanel } from "./McqUploadPanel";
+import { CanvasBuildPanel } from "./CanvasBuildPanel";
 import { DeleteExamForm } from "./DeleteExamForm";
 import { formatDateOnly, formatDateTime } from "@/lib/datetime";
 
@@ -218,16 +219,19 @@ export default async function AdminExamPage({
         </>
       )}
       {exam.status === "complete" && (
-        <div className="rounded-lg border-2 border-green-400 bg-green-50 p-6 text-center shadow-sm">
-          <p className="text-2xl font-bold text-green-800">
-            ✓ Marking complete — ready for Canvas upload
-          </p>
-          <p className="mt-2 text-sm text-green-900">
-            All grades have been finalised. Download the Canvas gradebook
-            using the button at the top right of this page. Then find this
-            exam on Canvas and import the grades.
-          </p>
-        </div>
+        <>
+          <div className="rounded-lg border-2 border-green-400 bg-green-50 p-6 text-center shadow-sm">
+            <p className="text-2xl font-bold text-green-800">
+              ✓ Marking complete — ready for Canvas upload
+            </p>
+            <p className="mt-2 text-sm text-green-900">
+              All grades have been finalised. Download the Canvas gradebook
+              using the button at the top right of this page. Then find this
+              exam on Canvas and import the grades.
+            </p>
+          </div>
+          <CanvasBuildPanel examId={exam.id} />
+        </>
       )}
       <div className="flex items-start justify-between">
         <div>
