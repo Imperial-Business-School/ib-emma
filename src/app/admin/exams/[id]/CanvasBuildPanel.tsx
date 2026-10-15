@@ -16,6 +16,7 @@ export function CanvasBuildPanel({ examId }: { examId: number }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [report, setReport] = useState<Report | null>(null);
+  const [hasFile, setHasFile] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -66,6 +67,7 @@ export function CanvasBuildPanel({ examId }: { examId: number }) {
       a.remove();
       URL.revokeObjectURL(url);
       if (fileRef.current) fileRef.current.value = "";
+      setHasFile(false);
       setReport(payload.report ?? null);
     });
   }
@@ -95,22 +97,34 @@ export function CanvasBuildPanel({ examId }: { examId: number }) {
           for more instructions.
         </li>
       </ul>
-      <form onSubmit={onSubmit} className="mt-4 flex flex-wrap items-center gap-3">
-        <input
-          ref={fileRef}
-          type="file"
-          name="file"
-          accept=".csv,text/csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-          required
-          className="text-sm"
-        />
-        <button
-          type="submit"
-          disabled={pending}
-          className="rounded bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {pending ? "Building…" : "Build & download"}
-        </button>
+      <form onSubmit={onSubmit} className="mt-4 space-y-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <label
+            htmlFor="canvas-gradebook-upload"
+            className="text-sm font-medium text-slate-700"
+          >
+            Canvas Gradebook upload:
+          </label>
+          <input
+            ref={fileRef}
+            id="canvas-gradebook-upload"
+            type="file"
+            name="file"
+            accept=".csv,text/csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            required
+            onChange={(e) => setHasFile(e.currentTarget.files !== null && e.currentTarget.files.length > 0)}
+            className="text-sm"
+          />
+        </div>
+        <div>
+          <button
+            type="submit"
+            disabled={pending || !hasFile}
+            className="rounded bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {pending ? "Building…" : "Build & Download"}
+          </button>
+        </div>
       </form>
       {report && (
         <div className="mt-3 rounded border border-green-200 bg-green-50 p-3 text-sm text-green-900">
