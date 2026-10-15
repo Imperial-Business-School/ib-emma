@@ -73,12 +73,28 @@ export function CanvasBuildPanel({ examId }: { examId: number }) {
   return (
     <section className="rounded-lg border bg-white p-6 shadow-sm">
       <h2 className="text-lg font-semibold">Build Canvas upload file</h2>
-      <p className="mt-2 text-sm text-slate-700">
-        Export the Gradebook for this module from Canvas, and upload it
-        below. Click &apos;Build &amp; Download&apos; to receive an updated
-        CSV, which you can upload to Canvas to import the exam grades. See
-        the EMMS user manual for more instructions.
-      </p>
+      <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-700">
+        <li>
+          Export the Gradebook for this module from Canvas, and upload it
+          below.
+        </li>
+        <li>
+          Click &apos;Build &amp; Download&apos; to receive an updated CSV,
+          which you can upload to Canvas to import the exam grades.
+        </li>
+        <li>
+          See the EMMS{" "}
+          <a
+            href="https://canvas.imperial.ac.uk/courses/455/pages/exam-marking-and-moderation-system-emms?module_item_id=2287623"
+            target="_blank"
+            rel="noreferrer noopener"
+            className="text-blue-600 hover:underline"
+          >
+            user manual
+          </a>{" "}
+          for more instructions.
+        </li>
+      </ul>
       <form onSubmit={onSubmit} className="mt-4 flex flex-wrap items-center gap-3">
         <input
           ref={fileRef}
