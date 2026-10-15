@@ -14,6 +14,7 @@ import { sweepDeadlineStatuses } from "@/lib/deadlines";
 import {
   adminOverrideGradeActionState,
   deferAdminCheckToFirstMarkerAction,
+  sendFirstMarkingReviewEmailAction,
   deleteSeatAction,
   reassignMarkerAction,
   regenerateMarkerTokenAction,
@@ -173,6 +174,33 @@ export default async function AdminExamPage({
   const justStarted =
     sp.started === "1" && exam.status === "primary_marking";
 
+  // Backfill: show a one-off "Send first-marking review email" button
+  // for exams whose first marker submitted BEFORE that email was wired
+  // up and no first_marking_review_admins row exists in email_log yet.
+  // Self-hiding once used.
+  const firstMarkingDone = [
+    "first_marking_review",
+    "secondary_marking",
+    "second_marking_overdue",
+    "second_marking_late",
+    "admin_check_required",
+    "review",
+    "complete",
+  ].includes(exam.status);
+  const firstMarkingReviewEmailSent = firstMarkingDone
+    ? (
+        (
+          await queryOne<{ n: number }>(
+            `SELECT COUNT(*)::int AS n FROM email_log
+             WHERE exam_id = $1 AND kind = 'first_marking_review_admins'`,
+            [exam.id],
+          )
+        )?.n ?? 0
+      ) > 0
+    : true;
+  const showFirstMarkingReviewBackfill =
+    firstMarkingDone && !firstMarkingReviewEmailSent;
+
   // Running mean / population std dev of the first marker's saved
   // grades, weighted by MCQ when MCQ is enabled -- matches what the
   // first marker sees in the footer of their own seats table, so the
@@ -306,6 +334,32 @@ export default async function AdminExamPage({
           </a>
         </div>
       </div>
+
+      {showFirstMarkingReviewBackfill && (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 shadow-sm">
+          <h3 className="font-semibold text-amber-900">
+            Missing notification
+          </h3>
+          <p className="mt-1 text-sm text-amber-900">
+            The &quot;first marking complete&quot; email was not sent for
+            this exam (it fires on first-marker submit, and this exam
+            submitted before that email was wired up). Click below to send
+            it now using the current template wording.
+          </p>
+          <form
+            action={async () => {
+              "use server";
+              await sendFirstMarkingReviewEmailAction(exam.id);
+            }}
+            className="mt-3"
+          >
+            <SubmitButton
+              label="Send first-marking review email"
+              className="rounded bg-amber-700 px-3 py-2 text-sm font-medium text-white hover:bg-amber-800"
+            />
+          </form>
+        </div>
+      )}
 
       {isAdminCheckRequired && (
         <div className="rounded-lg border border-rose-300 bg-rose-50 p-5 shadow-sm">

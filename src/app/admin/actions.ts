@@ -7,6 +7,7 @@ import { findOrCreateUser } from "@/lib/auth";
 import { query, queryOne, randomToken, type Exam } from "@/lib/db";
 import {
   notifyAdminsOfExamComplete,
+  notifyAdminsOfFirstMarkingReview,
   notifyFirstMarkerOfDiscrepancies,
 } from "@/lib/discrepancyEmails";
 import { parseTabularFile } from "@/lib/tabular";
@@ -1076,5 +1077,36 @@ export async function deferAdminCheckToFirstMarkerAction(examId: number) {
     differed: counts?.differed ?? 0,
     total: counts?.total ?? 0,
   });
+  revalidatePath(`/admin/exams/${examId}`);
+}
+
+// Backfill helper for the first_marking_review_admins notification --
+// used once for exams whose first marker submitted BEFORE the email
+// was wired up (e.g. the first live-use exam, id 11). Fires the normal
+// fanout so the current template wording is used and the email log
+// gets a proper audit row.
+export async function sendFirstMarkingReviewEmailAction(examId: number) {
+  await requireAdmin();
+  const exam = await queryOne<Exam>(
+    "SELECT status FROM exams WHERE id = $1",
+    [examId],
+  );
+  if (!exam) throw new Error("Exam not found");
+  // Only sensible for exams that have at least reached the review phase.
+  const okStatuses = [
+    "first_marking_review",
+    "secondary_marking",
+    "second_marking_overdue",
+    "second_marking_late",
+    "admin_check_required",
+    "review",
+    "complete",
+  ];
+  if (!okStatuses.includes(exam.status)) {
+    throw new Error(
+      `Exam status is ${exam.status}; first marking has not completed yet.`,
+    );
+  }
+  await notifyAdminsOfFirstMarkingReview(examId);
   revalidatePath(`/admin/exams/${examId}`);
 }
