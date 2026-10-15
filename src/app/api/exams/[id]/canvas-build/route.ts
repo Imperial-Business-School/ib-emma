@@ -12,14 +12,18 @@ import { computeWeightedGrade } from "@/lib/weighted";
 
 export const dynamic = "force-dynamic";
 
-// POST a Canvas gradebook export (CSV or XLSX). We echo it back as a
-// CSV with one extra column -- named after this exam -- carrying each
-// student's final grade from EMMS. Canvas strips leading zeros from
-// SIS User ID on export, so matching is done against a normalised CID
-// (leading zeros removed on both sides).
+// POST a Canvas gradebook export (CSV or XLSX). We emit a Canvas-import-
+// ready CSV in exactly this column order:
 //
-// Response is multipart-ish: JSON with the csv string plus a short
-// report so the client can show a summary without re-parsing the file.
+//   Student | ID | SIS User ID | SIS Login ID | Integration ID | Section | <Exam name>
+//
+// Every other column in the uploaded file (other assignments, Final
+// Grade, Current Score, etc.) is dropped. The last column is the exam
+// name, populated with each student's weighted final grade from EMMS so
+// Canvas treats this upload as a single-assignment import -- no "This
+// is a new assignment / Bogus, ignore it" prompt. Canvas strips the
+// leading zero from SIS User ID on export, so matching is done on a
+// canonical form (leading zeros stripped on both sides).
 export async function POST(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -64,7 +68,10 @@ export async function POST(
     rows = await parseTabularFile(file);
   } catch {
     return NextResponse.json(
-      { error: "Could not read the uploaded file. Expected a Canvas CSV or XLSX." },
+      {
+        error:
+          "Could not read the uploaded file. Expected a Canvas CSV or XLSX.",
+      },
       { status: 400 },
     );
   }
@@ -76,16 +83,21 @@ export async function POST(
   }
 
   // Canvas gradebook header row contains Student, ID, SIS User ID,
-  // SIS Login ID, Section, then one column per assignment. Find the
-  // SIS User ID column case-insensitively.
+  // SIS Login ID, Integration ID, Section, plus one column per
+  // assignment. Find each of the six identifier columns we care about;
+  // any missing one is tolerated (emitted blank in the output).
   const header = rows[0];
-  const sisIdx = header.findIndex(
-    (c) => c.trim().toLowerCase() === "sis user id",
-  );
-  const studentIdx = header.findIndex(
-    (c) => c.trim().toLowerCase() === "student",
-  );
-  if (sisIdx < 0) {
+  const findCol = (label: string): number =>
+    header.findIndex((c) => c.trim().toLowerCase() === label.toLowerCase());
+  const idx = {
+    student: findCol("Student"),
+    id: findCol("ID"),
+    sisUserId: findCol("SIS User ID"),
+    sisLoginId: findCol("SIS Login ID"),
+    integrationId: findCol("Integration ID"),
+    section: findCol("Section"),
+  };
+  if (idx.sisUserId < 0) {
     return NextResponse.json(
       {
         error:
@@ -101,9 +113,9 @@ export async function POST(
   );
 
   // Normalise CIDs to strip leading zeros on numeric strings; non-
-  // numeric CIDs (defensive) are kept as-is. Canvas's export drops the
-  // leading zero on its SIS User ID column, so matching has to agree
-  // on a canonical form.
+  // numeric CIDs are kept as-is. Canvas's export drops the leading
+  // zero on its SIS User ID column, so matching has to agree on a
+  // canonical form.
   const canonical = (s: string): string => {
     const t = s.trim();
     if (!t) return "";
@@ -132,51 +144,73 @@ export async function POST(
     }
   }
 
-  // Build the output row-by-row. Preserve every column in Canvas's
-  // header, add our exam column at the end. Metadata rows (any row
-  // whose SIS User ID is blank — e.g. the "Points Possible" line
-  // Canvas inserts between header and data) get a blank in the new
-  // column so Canvas's import ignores them for our new assignment.
   const assignmentHeader = exam.name;
-  const out: string[][] = [];
-  out.push([...header, assignmentHeader]);
+  const outHeader = [
+    "Student",
+    "ID",
+    "SIS User ID",
+    "SIS Login ID",
+    "Integration ID",
+    "Section",
+    assignmentHeader,
+  ];
 
+  // Pull cell by column name, blank if the input didn't have that
+  // column at all.
+  const pick = (row: string[], i: number): string =>
+    i < 0 ? "" : (row[i] ?? "").toString();
+
+  const out: string[][] = [outHeader];
   let gradesWritten = 0;
   const matchedCanonicalCids = new Set<string>();
 
   for (let r = 1; r < rows.length; r++) {
     const row = rows[r];
-    const sisRaw = (row[sisIdx] ?? "").trim();
+    const sisRaw = pick(row, idx.sisUserId).trim();
+
+    // Metadata rows (blank SIS User ID) -- Points Possible, Muted,
+    // or Canvas's one-blank-row separator between header and data.
+    // Preserve the Student cell (so "Points Possible" survives) and
+    // leave the rest blank, including the grade column.
     if (!sisRaw) {
-      // Metadata row (Points Possible, Muted, etc.) — passthrough,
-      // blank in our column.
-      out.push([...row, ""]);
+      const student = pick(row, idx.student);
+      // A completely blank row stays completely blank.
+      const isBlankRow = row.every(
+        (c) => (c ?? "").toString().trim() === "",
+      );
+      if (isBlankRow) {
+        out.push(["", "", "", "", "", "", ""]);
+      } else {
+        out.push([student, "", "", "", "", "", ""]);
+      }
       continue;
     }
+
+    // Data row -- emit the six Canvas identifier columns and try to
+    // match the student to an EMMS seat for the grade column.
+    const base = [
+      pick(row, idx.student),
+      pick(row, idx.id),
+      sisRaw,
+      pick(row, idx.sisLoginId),
+      pick(row, idx.integrationId),
+      pick(row, idx.section),
+    ];
     const key = canonical(sisRaw);
     const match = byCanonicalCid.get(key);
-    if (!match) {
-      // Student in Canvas but not in this EMMS exam — passthrough,
-      // blank in our column.
-      out.push([...row, ""]);
-      continue;
-    }
-    matchedCanonicalCids.add(key);
-    if (match.absent) {
-      // Absent in EMMS → blank cell per spec; Canvas keeps whatever is
-      // already there (or nothing).
-      out.push([...row, ""]);
-    } else if (match.grade == null) {
-      out.push([...row, ""]);
+    if (!match || match.absent || match.grade == null) {
+      // Canvas student with no EMMS match / absent / ungraded -> blank.
+      out.push([...base, ""]);
     } else {
-      out.push([...row, String(match.grade)]);
+      out.push([...base, String(match.grade)]);
       gradesWritten++;
     }
+    if (match) matchedCanonicalCids.add(key);
   }
 
-  // CIDs in EMMS that didn't appear in the uploaded Canvas export.
-  // These likely mean a Canvas enrollment issue the admin needs to
-  // resolve. Report by seat_number for traceability.
+  // CIDs in EMMS that didn't appear in the uploaded Canvas export --
+  // most likely a Canvas enrollment issue. Listed by seat_number so
+  // the admin can trace them back.
   const unmatched: Array<{ seat_number: string; cid: string }> = [];
   for (const s of submissions) {
     if (s.absent) continue;
@@ -199,10 +233,8 @@ export async function POST(
       assignmentHeader,
       gradesWritten,
       unmatched,
-      // We silently passthrough metadata and non-exam students; the
-      // client just needs the actionable numbers.
       canvasRowCount: rows.length - 1,
-      studentColumnFound: studentIdx >= 0,
+      studentColumnFound: idx.student >= 0,
     },
   });
 }
