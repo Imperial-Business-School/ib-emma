@@ -73,21 +73,12 @@ export function CanvasBuildPanel({ examId }: { examId: number }) {
   return (
     <section className="rounded-lg border bg-white p-6 shadow-sm">
       <h2 className="text-lg font-semibold">Build Canvas upload file</h2>
-      <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm text-slate-700">
-        <li>
-          In Canvas, go to the course Gradebook → Actions → Export → wait
-          for the CSV to download.
-        </li>
-        <li>
-          Upload that CSV below. EMMS adds this exam&apos;s final grades
-          in a new column named after the exam.
-        </li>
-        <li>
-          Download the resulting file and import it back into the Canvas
-          Gradebook. Canvas will match students on name and ID
-          automatically — no manual picker.
-        </li>
-      </ol>
+      <p className="mt-2 text-sm text-slate-700">
+        Export the Gradebook for this module from Canvas, and upload it
+        below. Click &apos;Build &amp; Download&apos; to receive an updated
+        CSV, which you can upload to Canvas to import the exam grades. See
+        the EMMS user manual for more instructions.
+      </p>
       <form onSubmit={onSubmit} className="mt-4 flex flex-wrap items-center gap-3">
         <input
           ref={fileRef}
