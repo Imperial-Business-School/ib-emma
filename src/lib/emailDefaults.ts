@@ -112,6 +112,19 @@ const EXAM_COMPLETE_BODY = [
   "Exam administration",
 ].join("\n");
 
+const FIRST_MARKING_REVIEW_ADMINS_BODY = [
+  "Hello,",
+  "",
+  "First marking is complete on {exam_name} on {module_name} ({module_code}).",
+  "",
+  "Please review the second-marking sample and click Start Second Marking when ready.",
+  "",
+  "Link to exam admin page: {link}",
+  "",
+  "Thank you,",
+  "Exam administration",
+].join("\n");
+
 export const DEFAULT_TEMPLATES: Record<EmailTemplateKind, EmailTemplateDefault> = {
   first_commence: {
     subject: "Exam marking: please begin marking {exam_name} for {module_name}",
@@ -154,6 +167,13 @@ export const DEFAULT_TEMPLATES: Record<EmailTemplateKind, EmailTemplateDefault> 
       "Exam marking: please resolve grade discrepancies [{module_name}, {exam_name}]",
     body: FIRST_MARKER_REVIEW_BODY,
     cc: "{second_marker}",
+    urgent: false,
+  },
+  first_marking_review_admins: {
+    subject:
+      "First marking complete — review sample required for {exam_name} ({module_code})",
+    body: FIRST_MARKING_REVIEW_ADMINS_BODY,
+    cc: "{other_admins}",
     urgent: false,
   },
   admin_check_required: {

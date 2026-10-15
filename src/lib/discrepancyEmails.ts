@@ -88,7 +88,10 @@ export async function notifyFirstMarkerOfDiscrepancies({
 // exam_complete. First admin (alphabetical by name) lands in To; the
 // rest are rolled into CC by the template's {other_admins} token.
 async function fanoutToAdmins(params: {
-  templateKind: "admin_check_required" | "exam_complete";
+  templateKind:
+    | "admin_check_required"
+    | "exam_complete"
+    | "first_marking_review_admins";
   examId: number;
   vars: Record<string, string | number | null | undefined>;
 }): Promise<void> {
@@ -123,6 +126,29 @@ export async function notifyAdminsOfExamComplete(
   const origin = await getRequestOrigin();
   await fanoutToAdmins({
     templateKind: "exam_complete",
+    examId,
+    vars: {
+      exam_name: exam.name,
+      module_name: moduleName,
+      module_code: moduleCode,
+      link: `${origin}/admin/exams/${exam.id}`,
+      support_email: SUPPORT_EMAIL,
+    },
+  });
+}
+
+// Fires when the first marker submits and the exam transitions to
+// first_marking_review. The admin needs to review the sample and click
+// Start Second Marking.
+export async function notifyAdminsOfFirstMarkingReview(
+  examId: number,
+): Promise<void> {
+  const ctx = await loadExamContext(examId);
+  if (!ctx) return;
+  const { exam, moduleName, moduleCode } = ctx;
+  const origin = await getRequestOrigin();
+  await fanoutToAdmins({
+    templateKind: "first_marking_review_admins",
     examId,
     vars: {
       exam_name: exam.name,

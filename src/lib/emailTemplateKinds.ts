@@ -10,6 +10,7 @@ export const EMAIL_TEMPLATE_KINDS = [
   "first_late",
   "second_late",
   "first_marker_review",
+  "first_marking_review_admins",
   "admin_check_required",
   "exam_complete",
 ] as const;
@@ -35,6 +36,8 @@ export const KIND_DESCRIPTIONS: Record<EmailTemplateKind, string> = {
     "Sent to the second marker when their marking is 5+ working days overdue. Exam manager is normally CC'd.",
   first_marker_review:
     "Sent to the first marker when second marking completes with < 33.33% grade discrepancies. Second marker is normally CC'd.",
+  first_marking_review_admins:
+    "Sent to admins when the first marker submits their marks and the exam needs sample review before second marking begins. First admin in To, others in CC.",
   admin_check_required:
     "Sent to admins when second marking completes with ≥ 33.33% grade discrepancies. First admin in To, others in CC.",
   exam_complete:
@@ -115,6 +118,13 @@ export const PLACEHOLDERS: Record<EmailTemplateKind, readonly string[]> = {
     "link",
     "support_email",
   ],
+  first_marking_review_admins: [
+    "exam_name",
+    "module_name",
+    "module_code",
+    "link",
+    "support_email",
+  ],
   admin_check_required: [
     "exam_name",
     "module_name",
@@ -144,6 +154,7 @@ export const CC_PLACEHOLDERS: Record<EmailTemplateKind, readonly string[]> = {
   first_late: [],
   second_late: [],
   first_marker_review: ["second_marker"],
+  first_marking_review_admins: ["other_admins"],
   admin_check_required: ["other_admins"],
   exam_complete: ["other_admins"],
 };

@@ -11,6 +11,7 @@ import { computeSampleIdsForMode } from "@/lib/sampling";
 import {
   notifyAdminsOfCheckRequired,
   notifyAdminsOfExamComplete,
+  notifyAdminsOfFirstMarkingReview,
   notifyFirstMarkerOfDiscrepancies,
 } from "@/lib/discrepancyEmails";
 import { parseTabularFile } from "@/lib/tabular";
@@ -610,6 +611,8 @@ export async function completePrimaryMarkingByTokenAction(
      WHERE id = $1`,
     [examId],
   );
+
+  await notifyAdminsOfFirstMarkingReview(examId);
 
   revalidatePath(`/m/${examId}/${token}`);
   revalidatePath(`/admin/exams/${examId}`);
